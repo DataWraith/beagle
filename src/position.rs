@@ -24,6 +24,10 @@ impl Position {
     }
 
     pub fn manhattan_distance(&self, other : &Position) -> usize  {
-        ((self.x - other.x).abs() as usize + (self.y - other.y).abs() as usize)
+        let result = ((self.x - other.x).abs() as usize + (self.y - other.y).abs() as usize);
+        if result == 1 {
+            println!("({}, {}) - ({}, {})", self.x, self.y, other.x, other.y)
+        }
+        result
     }
 }

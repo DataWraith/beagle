@@ -7,9 +7,9 @@ pub struct State {
     pub game: Game,
     pub hero: Hero,
     pub token: String,
-	#[serde(rename="viewUrl")]
+    #[serde(rename="viewUrl")]
     pub view_url: String,
-	#[serde(rename="playUrl")]
+    #[serde(rename="playUrl")]
     pub play_url: String,
 }
 
@@ -55,44 +55,52 @@ impl State {
     }
 
     pub fn make_move(&mut self, direction : &str) {
-            let h_idx = (self.game.turn % 4) as usize;
+        let h_idx = (self.game.turn % 4) as usize;
+        let mut hero_died = false;
         println!("Turn {}: {}, ({})", self.game.turn, direction, h_idx + 1);
 
-            match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
-                Tile::Wall => (),
-                Tile::Hero(_) => (),
-                Tile::Tavern => if self.game.heroes[h_idx].gold >= 2 {
-                    self.game.heroes[h_idx].gold -= 2;
-                    self.game.heroes[h_idx].life += 50;
-                    if self.game.heroes[h_idx].life > 100 {
-                        self.game.heroes[h_idx].life = 100;
+        match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
+            Tile::Wall => (),
+            Tile::Hero(_) => (),
+            Tile::Tavern => if self.game.heroes[h_idx].gold >= 2 {
+                self.game.heroes[h_idx].gold -= 2;
+                self.game.heroes[h_idx].life += 50;
+                if self.game.heroes[h_idx].life > 100 {
+                    self.game.heroes[h_idx].life = 100;
+                }
+            },
+            Tile::Air  => {
+                self.game.board.put_tile(&self.game.heroes[h_idx].pos, Tile::Air);
+                self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction), Tile::Hero(h_idx + 1));
+                self.game.heroes[h_idx].pos = self.game.heroes[h_idx].pos.neighbor(direction);
+            },
+            Tile::Mine(hero_id) => if hero_id != h_idx + 1 {
+                if self.game.heroes[h_idx].life <= 20 {
+                    hero_died = true;
+                    self.kill(h_idx + 1, 0)
+                } else {
+                    if hero_id > 0 {
+                        self.game.heroes[hero_id - 1].mine_count -= 1;
                     }
-                },
-                Tile::Air  => {
-                    self.game.board.put_tile(&self.game.heroes[h_idx].pos, Tile::Air);
-                    self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction), Tile::Hero(h_idx + 1));
-                    self.game.heroes[h_idx].pos = self.game.heroes[h_idx].pos.neighbor(direction);
-                },
-                Tile::Mine(hero_id) => if hero_id != h_idx + 1 {
-                    if self.game.heroes[h_idx].life <= 20 {
-                        self.kill(h_idx + 1, 0)
-                    } else {
-                        if hero_id > 0 {
-                            self.game.heroes[hero_id - 1].mine_count -= 1;
-                        }
-                        self.game.heroes[h_idx].mine_count += 1;
-                        self.game.heroes[h_idx].life -= 20;
-                        self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction), Tile::Mine(h_idx + 1));
-                    }
+                    self.game.heroes[h_idx].mine_count += 1;
+                    self.game.heroes[h_idx].life -= 20;
+                    self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction), Tile::Mine(h_idx + 1));
                 }
             }
+        }
 
-        for i in 0..(4 as usize) {
-            if self.game.heroes[i].pos.manhattan_distance(&self.game.heroes[h_idx].pos.clone()) == 1 {
-                if self.game.heroes[i].life <= 20 {
-                    self.kill(i + 1, h_idx  + 1);
-                } else {
-                    self.game.heroes[i].life -= 20;
+        if !hero_died {
+            for i in 0..(4 as usize) {
+                if i == h_idx {
+                    continue;
+                }
+
+                if self.game.heroes[i].pos.manhattan_distance(&self.game.heroes[h_idx].pos.clone()) == 1 {
+                    if self.game.heroes[i].life <= 20 {
+                        self.kill(i + 1, h_idx  + 1);
+                    } else {
+                        self.game.heroes[i].life -= 20;
+                    }
                 }
             }
         }
@@ -104,11 +112,7 @@ impl State {
         }
 
         self.game.heroes[h_idx].last_dir = String::from(direction);
-
-        if h_idx == self.hero.id - 1 {
-            self.hero = self.game.heroes[h_idx].clone();
-        }
-
+        self.hero = self.game.heroes[self.hero.id - 1].clone();
         self.game.turn += 1;
 
         if self.game.turn == self.game.max_turns {

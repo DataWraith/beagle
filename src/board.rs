@@ -68,8 +68,8 @@ impl Board {
           }
       }
 
-      for x in 1..(self.size) {
-          for y in 1..(self.size) {
+      for x in 0..(self.size) {
+          for y in 0..(self.size) {
               let idx = (self.size as usize) * (x as usize) + (y as usize);
 
              match  self.board[idx] {
