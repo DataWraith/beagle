@@ -5,7 +5,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn neighbor(&self, dir : &'static str) -> Position {
+    pub fn neighbor(&self, dir : &str) -> Position {
         match dir {
             "North" => Position{x: self.x - 1, y: self.y},
             "East"  => Position{x: self.x, y: self.y + 1},
@@ -23,7 +23,7 @@ impl Position {
          Position{x: self.x, y: self.y - 1}]
     }
 
-    pub fn manhattan_distance(&self, other : Position) -> usize  {
+    pub fn manhattan_distance(&self, other : &Position) -> usize  {
         ((self.x - other.x).abs() as usize + (self.y - other.y).abs() as usize)
     }
 }

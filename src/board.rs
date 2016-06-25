@@ -1,7 +1,9 @@
+use std::fmt;
+
 use tile::Tile;
 use position::Position;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Eq)]
 pub struct Board {
     pub size: i8,
     #[serde(default)]
@@ -9,7 +11,36 @@ pub struct Board {
     #[serde(default)]
     initialized: bool,
     tiles: String,
+    #[serde(default)]
     pub mine_pos : Vec<Position>,
+}
+
+impl PartialEq for Board {
+    fn eq(&self, other: &Board) -> bool {
+        if self.size != other.size {
+            return false;
+        }
+
+        for i in 0..((self.size as usize) * (self.size as usize)) {
+            if self.board[i] != other.board[i] {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+impl fmt::Display for Board {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for x in 0..self.size {
+            for y in 0..self.size {
+                write!(f, "{}", self.tile_at(&Position{x: x, y: y}));
+            }
+            write!(f, "\n");
+        }
+        Ok(())
+    }
 }
 
 impl Board {
@@ -39,7 +70,7 @@ impl Board {
 
       for x in 1..(self.size) {
           for y in 1..(self.size) {
-              let idx = (self.size as usize) * (y as usize) + (x as usize);
+              let idx = (self.size as usize) * (x as usize) + (y as usize);
 
              match  self.board[idx] {
                  Tile::Mine(_) => self.mine_pos.push(Position{x: x, y: y}),
@@ -56,12 +87,16 @@ impl Board {
           panic!("tile_at called on uninitialized board")
       }
 
-      let idx = pos.y * self.size + pos.x;
-      self.board[idx as usize].clone()
+      if pos.x < 0 || pos.x >= self.size || pos.y < 0 || pos.y >= self.size {
+          return Tile::Wall;
+      }
+
+      let idx = (pos.x as usize) * (self.size as usize) + (pos.y as usize);
+      self.board[idx].clone()
     }
 
     pub fn put_tile(&mut self, pos : &Position, t : Tile) {
-        let idx = (pos.y as usize) * (self.size as usize) + (pos.x as usize);
+        let idx = (pos.x as usize) * (self.size as usize) + (pos.y as usize);
         self.board[idx] = t;
     }
 }

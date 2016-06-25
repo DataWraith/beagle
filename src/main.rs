@@ -11,8 +11,6 @@ mod board;
 mod position;
 mod tile    ;
 
-use position::Position;
-
 use std::io::Read;
 use hyper::client::*;
 use hyper::header::ContentType;
@@ -35,8 +33,9 @@ fn main() {
 	res.read_to_string(&mut body).ok();
 
     let mut state : state::State = serde_json::from_str(&body).unwrap();
+    state.game.board.initialize();
 
-	println!("{}", state.view_url);
+    let mut new_state : state::State;
 
 	while !state.game.finished {
 		res = client.post(Url::parse(&state.play_url).unwrap())
@@ -50,9 +49,26 @@ fn main() {
 		  return;
 		}
 
-		body = "".to_owned();
+		body = String::default();
 		res.read_to_string(&mut body).ok();
-		state = serde_json::from_str(&body).unwrap();
-        state.game.board.initialize();
+		new_state = serde_json::from_str(&body).unwrap();
+        new_state.game.board.initialize();
+
+        state.make_move("Stay");
+        let h_idx = new_state.game.turn % 4;
+        for i in 1..4 {
+            let ref mv = new_state.game.heroes[(h_idx + i) % 4].last_dir;
+            state.make_move(&mv);
+
+            println!("{}", state.game.board);
+            println!("\n\n");
+        }
+
+        if state != new_state {
+            println!("{}", new_state.game.board);
+            assert_eq!(state, new_state);
+        }
 	}
+
+	println!("{}", state.view_url);
 }

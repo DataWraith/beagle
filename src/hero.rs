@@ -1,6 +1,6 @@
 use position::Position;
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct Hero {
     pub id: usize,
     pub name: String,
