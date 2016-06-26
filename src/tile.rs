@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum Tile {
     Wall,
     Air,

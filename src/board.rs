@@ -1,9 +1,10 @@
 use std::fmt;
+use std::hash;
 
 use tile::Tile;
 use position::Position;
 
-#[derive(Deserialize, Debug, Eq)]
+#[derive(Clone, Deserialize, Debug, Eq)]
 pub struct Board {
     pub size: i8,
     #[serde(default)]
@@ -13,6 +14,16 @@ pub struct Board {
     tiles: String,
     #[serde(default)]
     pub mine_pos : Vec<Position>,
+}
+
+impl hash::Hash for Board {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.size.hash(state);
+        self.initialized.hash(state);
+        for t in self.board.iter() {
+            t.hash(state);
+        }
+    }
 }
 
 impl PartialEq for Board {

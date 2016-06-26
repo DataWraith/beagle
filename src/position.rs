@@ -1,4 +1,4 @@
-#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Position {
     pub x: i8,
     pub y: i8,
@@ -26,7 +26,7 @@ impl Position {
     pub fn manhattan_distance(&self, other : &Position) -> usize  {
         let result = ((self.x - other.x).abs() as usize + (self.y - other.y).abs() as usize);
         if result == 1 {
-            println!("({}, {}) - ({}, {})", self.x, self.y, other.x, other.y)
+            //println!("({}, {}) - ({}, {})", self.x, self.y, other.x, other.y)
         }
         result
     }

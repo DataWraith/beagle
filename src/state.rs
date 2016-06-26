@@ -1,8 +1,10 @@
+use std::hash;
+
 use game::Game;
 use hero::Hero;
 use tile::Tile;
 
-#[derive(Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct State {
     pub game: Game,
     pub hero: Hero,
@@ -13,9 +15,18 @@ pub struct State {
     pub play_url: String,
 }
 
+impl hash::Hash for State {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.game.hash(state);
+        self.token.hash(state);
+        self.view_url.hash(state);
+        self.play_url.hash(state);
+    }
+}
+
 impl State {
     fn kill(&mut self, hero_id : usize, killer_id : usize) {
-        println!("{} killed by {}", hero_id, killer_id);
+        //println!("{} killed by {}", hero_id, killer_id);
 
         if killer_id > 0 {
             self.game.heroes[killer_id - 1].mine_count += self.game.heroes[hero_id - 1].mine_count;
@@ -30,7 +41,7 @@ impl State {
             }
         }
 
-        println!("{:?}", mpos);
+        //println!("{:?}", mpos);
 
         for ref pos in mpos {
             self.game.board.put_tile(pos, Tile::Mine(killer_id));
@@ -54,10 +65,42 @@ impl State {
         self.game.heroes[hero_id - 1].life = 100;
     }
 
+    pub fn get_moves(&self) -> Vec<&'static str> {
+        let mut result : Vec<&'static str> = vec![];
+        let ref h = self.game.heroes[self.game.turn % 4];
+
+        if self.game.finished {
+            return result;
+        }
+
+        if h.crashed {
+            result.push("Stay");
+            return result;
+        }
+
+        for dir in ["North", "East", "South", "West"].iter() {
+            let t = self.game.board.tile_at(&self.game.heroes[self.game.turn%4].pos.neighbor(dir));
+
+            match t {
+                Tile::Wall => (),
+                Tile::Air => result.push(dir),
+                Tile::Mine(x) if x == h.id => (),
+                Tile::Mine(x) => result.push(dir),
+                Tile::Tavern => if h.gold >= 2 {
+                    result.push(dir);
+                },
+                Tile::Hero(_) => (),
+            }
+        }
+
+        result.push("Stay");
+        result
+    }
+
     pub fn make_move(&mut self, direction : &str) {
         let h_idx = (self.game.turn % 4) as usize;
         let mut hero_died = false;
-        println!("Turn {}: {}, ({})", self.game.turn, direction, h_idx + 1);
+        //println!("Turn {}: {}, ({})", self.game.turn, direction, h_idx + 1);
 
         match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
             Tile::Wall => (),
