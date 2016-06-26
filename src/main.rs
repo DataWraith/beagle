@@ -23,7 +23,7 @@ use hyper::Url;
 fn main() {
     let mut bot = bot::Bot::new();
     let client = Client::new();
-	let mut res = client.post("http://vindinium.org/api/training")
+	let mut res = client.post("http://vindinium.org/api/arena")
 		.header(ContentType("application/x-www-form-urlencoded".parse().unwrap()))
 		.body("key=eqwxqpa8")
 		.send()
@@ -40,9 +40,9 @@ fn main() {
     let mut state : state::State = serde_json::from_str(&body).unwrap();
     state.game.board.initialize();
 
-    let mut new_state : state::State;
+    let mut new_state = state.clone();
 
-	while !state.game.finished {
+	while !new_state.game.finished {
         let mv = bot.choose_move(&state);
 		println!("{}: {}", state.game.turn, mv);
 		
@@ -67,10 +67,14 @@ fn main() {
         for i in 1..4 {
             let ref mv = new_state.game.heroes[(h_idx + i) % 4].last_dir;
             state.make_move(&mv);
-
-            println!("{}", state.game.board);
-            println!("\n\n");            
         }
+		
+		println!("{}", state.game.board);
+		
+		state.game.heroes[0].crashed = new_state.game.heroes[0].crashed;
+		state.game.heroes[1].crashed = new_state.game.heroes[1].crashed;
+		state.game.heroes[2].crashed = new_state.game.heroes[2].crashed;
+		state.game.heroes[3].crashed = new_state.game.heroes[3].crashed;
 
         if state != new_state {
             println!("{}", new_state.game.board);

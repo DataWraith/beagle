@@ -69,7 +69,7 @@ impl State {
         let mut result : Vec<&'static str> = vec![];
         let ref h = self.game.heroes[self.game.turn % 4];
 
-        if self.game.finished {
+        if self.game.turn > self.game.max_turns {
             return result;
         }
 
