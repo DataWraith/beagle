@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher, SipHasher};
 
 use time;
@@ -6,6 +6,8 @@ use rand;
 use rand::Rng;
 
 use state::State;
+use position::Position;
+use tile::Tile;
 
 struct Node {
     scores: [f32; 4],
@@ -13,18 +15,126 @@ struct Node {
 }
 
 pub struct Bot {
+    initialized: bool,
     nodes: HashMap<u64, Box<Node>>,
+	tavern_dist: HashMap<Position, u8>,
+	mine_dist: HashMap<Position, Vec<(Position, u8, &'static str)>>,
 }
 
 impl Bot {
     pub fn new() -> Bot {
         Bot{
-            nodes: HashMap::new()
+			initialized: false,
+            nodes: HashMap::new(),
+			tavern_dist: HashMap::new(),
+			mine_dist: HashMap::new(),
         }
     }
+	
+	fn get_closest_tavern(&self, pos : &Position) -> (u8, &'static str) {
+		let mut min_dist = 255u8;
+		let mut min_dir = "Stay";
+		
+		for mv in ["North", "East", "South", "West"].iter() {
+			let t = pos.neighbor(mv);
+			if self.tavern_dist.contains_key(&t) {
+				let dist = self.tavern_dist[&t];
+				if dist < min_dist {
+					min_dist = dist;
+					min_dir = mv;
+				}
+			}
+		}
+		
+		(min_dist, min_dir)
+	}
+	
+	fn get_closest_mine(&mut self, pos : &Position, player_id : usize, s : &State) -> (u8, &'static str) {
+		if !self.mine_dist.contains_key(pos) {
+			let mut queue = VecDeque::new();
+			let mut seen = HashSet::new();
+			let mut result = Vec::new();
+			
+			seen.insert(*pos);
+			queue.push_back((pos.neighbor("North"), 1, "North"));
+			queue.push_back((pos.neighbor("East"), 1, "East"));
+			queue.push_back((pos.neighbor("South"), 1, "South"));
+			queue.push_back((pos.neighbor("West"), 1, "West"));
+			
+			while !queue.is_empty() {
+				let (cur, dist, dir) = queue.pop_front().unwrap();
+				
+				match s.game.board.tile_at(&cur) {
+					Tile::Mine(_) => {
+						result.push((cur, dist, dir));
+					}
+					Tile::Air | Tile::Hero(_) => {
+						for n in cur.neighbors().iter() {
+							if !seen.contains(n) {
+								queue.push_back((*n, dist + 1, dir));
+								seen.insert(cur);
+							}
+						}
+					},
+					_ => (),
+				}
+			}
+			
+			self.mine_dist.insert(*pos, result);
+		}
+		
+		for &(mpos, mdist, mdir) in self.mine_dist[pos].iter() {
+			match s.game.board.tile_at(&mpos) {
+				Tile::Mine(x) if x != player_id => return (mdist, mdir),
+				_ => (),
+			}
+		}
+		
+		(0, "Stay")
+	}
+	
+	fn initialize(&mut self, s : &State) {
+		let mut queue = VecDeque::new();
+		
+		for x in 0..s.game.board.size {
+			for y in 0..s.game.board.size {
+				match s.game.board.tile_at(&Position{x: x, y: y}) {
+					Tile::Tavern => {
+						queue.push_back(Position{x: x, y: y});
+						self.tavern_dist.insert(Position{x: x, y: y}, 0u8);
+					},
+					_ => (),
+				}
+			}
+		}
+		
+		while !queue.is_empty() {
+			let cur = queue.pop_front().unwrap();
+			
+			for n in cur.neighbors().iter() {
+				if !self.tavern_dist.contains_key(n) {
+					match s.game.board.tile_at(n) {
+					Tile::Air | Tile::Hero(_) => {
+							let dist = self.tavern_dist[&cur] + 1u8;
+							self.tavern_dist.insert(*n, dist);
+							queue.push_back(*n);
+						}
+						_ => (),
+					}
+				}
+			}
+		}
+	
+		self.initialized = true;
+	}
 
     pub fn choose_move(&mut self, s : &State) -> &'static str {
         let end_time = time::get_time() + time::Duration::milliseconds(800);
+		
+		if !self.initialized {
+			self.initialize(s);
+		}
+		
         let mut hasher = SipHasher::new();
         s.hash(&mut hasher);
         let root_hash = hasher.finish();
@@ -76,7 +186,19 @@ impl Bot {
     pub fn playout(&self, s : &mut State) -> [f32; 4] {
         while !s.get_moves().is_empty() {
 			let moves = s.get_moves();
-            let mv = rand::thread_rng().choose(&moves).unwrap();
+			let (_, tdir) = self.get_closest_tavern(&s.game.heroes[s.game.turn%4].pos);
+			let (mdist, mdir) = self.get_closest_tavern(&s.game.heroes[s.game.turn%4].pos);
+			let mut mv;
+			
+			if rand::thread_rng().next_f32() < 0.1 {
+				mv = rand::thread_rng().choose(&moves).unwrap();
+			} else {
+				if s.game.heroes[s.game.turn % 4].life - mdist < 20 {
+					mv = &tdir;
+				} else {
+					mv = &mdir;
+				}
+			}
             s.make_move(mv);
         }
 
@@ -128,12 +250,12 @@ impl Bot {
 			let mut sort_score : f32;
 			
 			if visits == 0f32 {
-				sort_score = 10000f32;
+				sort_score = 10000f32 + rand::thread_rng().next_f32();
 			} else {
-			let turns_left = (st.game.max_turns - st.game.turn) / 4;
-			let heuristic = (st.game.heroes[s.game.turn % 4].gold as f32 + turns_left as f32 * st.game.heroes[s.game.turn % 4].mine_count as f32) / 10000f32;
+			//let turns_left = (st.game.max_turns - st.game.turn) / 4;
+			//let heuristic = (st.game.heroes[s.game.turn % 4].gold as f32 + turns_left as f32 * st.game.heroes[s.game.turn % 4].mine_count as f32) / 10000f32;
 			
-             sort_score = xavg + 1.4f32 *(self.nodes[&node_hash].visits.ln() / visits).sqrt() + heuristic / (1f32 + visits);
+             sort_score = xavg + 1.4f32 *(self.nodes[&node_hash].visits.ln() / visits).sqrt(); // + heuristic / (1f32 + visits);
 			}
 
             if sort_score > max_score {
