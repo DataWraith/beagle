@@ -5,6 +5,7 @@ extern crate time;
 extern crate rand;
 extern crate serde_json;
 extern crate hyper;
+extern crate fnv;
 
 mod state;
 mod game;
@@ -13,17 +14,22 @@ mod board;
 mod position;
 mod tile;
 mod bot;
+mod transposition_table;
+mod zobrist;
 
 use std::io::Read;
-use std::hash::{Hash, Hasher, SipHasher};
+//use std::hash::{Hash, Hasher, SipHasher};
 use hyper::client::*;
 use hyper::header::ContentType;
 use hyper::Url;
 
 fn main() {
+	unsafe {
+		zobrist::ZOBRIST = zobrist::ZobristTable::default();
+	}
     let mut bot = bot::Bot::new();
     let client = Client::new();
-	let mut res = client.post("http://vindinium.org/api/arena")
+	let mut res = client.post("http://vindinium.org/api/arena	")
 		.header(ContentType("application/x-www-form-urlencoded".parse().unwrap()))
 		.body("key=eqwxqpa8")
 		.send()
@@ -41,8 +47,8 @@ fn main() {
     state.game.board.initialize();
 
     let mut new_state = state.clone();
-
-	while !new_state.game.finished {
+	
+	while true {
         let mv = bot.choose_move(&state);
 		println!("{}: {}", state.game.turn, mv);
 		
@@ -60,24 +66,34 @@ fn main() {
 		body = String::default();
 		res.read_to_string(&mut body).ok();
 		new_state = serde_json::from_str(&body).unwrap();
-        new_state.game.board.initialize();
-
+		
+		if new_state.game.finished {
+		  break;
+		}
+		
+		if state.game.heroes[0].crashed != new_state.game.heroes[0].crashed ||
+		   state.game.heroes[1].crashed != new_state.game.heroes[1].crashed ||
+		   state.game.heroes[2].crashed != new_state.game.heroes[2].crashed ||
+		   state.game.heroes[3].crashed != new_state.game.heroes[3].crashed {
+		   
+		   state = new_state.clone();
+		   state.game.board.initialize();
+		} else {        
         state.make_move(mv);
         let h_idx = new_state.game.turn % 4;
         for i in 1..4 {
             let ref mv = new_state.game.heroes[(h_idx + i) % 4].last_dir;
             state.make_move(&mv);
-        }
+        }}
 		
-		println!("{}", state.game.board);
+		//println!("{}", state.game.board);
 		
-		state.game.heroes[0].crashed = new_state.game.heroes[0].crashed;
-		state.game.heroes[1].crashed = new_state.game.heroes[1].crashed;
-		state.game.heroes[2].crashed = new_state.game.heroes[2].crashed;
-		state.game.heroes[3].crashed = new_state.game.heroes[3].crashed;
+		
 
         if state != new_state {
-            println!("{}", new_state.game.board);
+            println!("{}", state.game.board);
+			new_state.game.board.initialize();
+			println!("{}", new_state.game.board);
             assert_eq!(state, new_state);
         }
 	}

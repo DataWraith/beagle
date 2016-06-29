@@ -3,6 +3,7 @@ use std::hash;
 
 use tile::Tile;
 use position::Position;
+use zobrist::ZOBRIST;
 
 #[derive(Clone, Deserialize, Debug, Eq)]
 pub struct Board {
@@ -14,15 +15,13 @@ pub struct Board {
     tiles: String,
     #[serde(default)]
     pub mine_pos : Vec<Position>,
+	#[serde(default)]
+	pub hash : u64,
 }
 
 impl hash::Hash for Board {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        self.size.hash(state);
-        self.initialized.hash(state);
-        for t in self.board.iter() {
-            t.hash(state);
-        }
+		self.hash.hash(state);
     }
 }
 
@@ -31,12 +30,13 @@ impl PartialEq for Board {
         if self.size != other.size {
             return false;
         }
-
+		
+		if self.initialized && other.initialized {
         for i in 0..((self.size as usize) * (self.size as usize)) {
             if self.board[i] != other.board[i] {
                 return false;
             }
-        }
+        }}
 
         true
     }
@@ -44,12 +44,13 @@ impl PartialEq for Board {
 
 impl fmt::Display for Board {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if self.initialized {
         for x in 0..self.size {
             for y in 0..self.size {
                 write!(f, "{}", self.tile_at(&Position{x: x, y: y}));
             }
             write!(f, "\n");
-        }
+        }}	
         Ok(())
     }
 }
@@ -58,7 +59,9 @@ impl Board {
     pub fn initialize(&mut self) {
       self.board = vec![Tile::Wall; (self.size as usize * self.size as usize)];
       self.mine_pos = vec![];
+	  self.hash = 0;
 
+	  {
       let b = self.tiles.as_bytes();
 
       for i in 0..((self.size as usize * self.size as usize)) {
@@ -76,8 +79,16 @@ impl Board {
               (64, 51) => Tile::Hero(3),
               (64, 52) => Tile::Hero(4),
               _ => panic!("Unprocessable tile found.")
-          }
-      }
+          };
+		  unsafe {
+		  self.hash ^= ZOBRIST.keys[12 as usize * i as usize + self.board[i].to_usize()];
+		  }
+		}
+		
+		
+	  }
+	  
+	  self.tiles = String::default();
 
       for x in 0..(self.size) {
           for y in 0..(self.size) {
@@ -108,6 +119,11 @@ impl Board {
 
     pub fn put_tile(&mut self, pos : &Position, t : Tile) {
         let idx = (pos.x as usize) * (self.size as usize) + (pos.y as usize);
+		
+		unsafe {
+		self.hash ^= ZOBRIST.keys[12 * idx + self.board[idx].to_usize()];
         self.board[idx] = t;
+		self.hash ^= ZOBRIST.keys[12 * idx + self.board[idx].to_usize()];
+		}
     }
 }

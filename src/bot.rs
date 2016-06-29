@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::hash::{Hash, Hasher, SipHasher};
+use std::hash::{Hash, Hasher};
+use fnv::FnvHasher;
 
 use time;
 use rand;
@@ -8,6 +9,14 @@ use rand::Rng;
 use state::State;
 use position::Position;
 use tile::Tile;
+use transposition_table::{Table, Entry};
+use zobrist::ZobristTable;
+
+#[derive(Eq, PartialEq)]
+enum Turn {
+    Max,
+    Min,
+}
 
 struct Node {
     scores: [f32; 4],
@@ -16,275 +25,515 @@ struct Node {
 
 pub struct Bot {
     initialized: bool,
-    nodes: HashMap<u64, Box<Node>>,
-	tavern_dist: HashMap<Position, u8>,
-	mine_dist: HashMap<Position, Vec<(Position, u8, &'static str)>>,
+	tt: Table,
+    tavern_dist: HashMap<Position, u8>,
+    mine_dist: HashMap<Position, Vec<(Position, u8, &'static str)>>,
 }
 
 impl Bot {
     pub fn new() -> Bot {
         Bot{
-			initialized: false,
-            nodes: HashMap::new(),
+            initialized: false,
+            tt: Table::new(100000u64),
 			tavern_dist: HashMap::new(),
-			mine_dist: HashMap::new(),
+            mine_dist: HashMap::new(),
         }
     }
-	
-	fn get_closest_tavern(&self, pos : &Position) -> (u8, &'static str) {
-		let mut min_dist = 255u8;
-		let mut min_dir = "Stay";
-		
-		for mv in ["North", "East", "South", "West"].iter() {
-			let t = pos.neighbor(mv);
-			if self.tavern_dist.contains_key(&t) {
-				let dist = self.tavern_dist[&t];
-				if dist < min_dist {
-					min_dist = dist;
-					min_dir = mv;
-				}
-			}
-		}
-		
-		(min_dist, min_dir)
-	}
-	
-	fn get_closest_mine(&mut self, pos : &Position, player_id : usize, s : &State) -> (u8, &'static str) {
-		if !self.mine_dist.contains_key(pos) {
-			let mut queue = VecDeque::new();
-			let mut seen = HashSet::new();
-			let mut result = Vec::new();
-			
-			seen.insert(*pos);
-			queue.push_back((pos.neighbor("North"), 1, "North"));
-			queue.push_back((pos.neighbor("East"), 1, "East"));
-			queue.push_back((pos.neighbor("South"), 1, "South"));
-			queue.push_back((pos.neighbor("West"), 1, "West"));
-			
-			while !queue.is_empty() {
-				let (cur, dist, dir) = queue.pop_front().unwrap();
-				
-				match s.game.board.tile_at(&cur) {
-					Tile::Mine(_) => {
-						result.push((cur, dist, dir));
-					}
-					Tile::Air | Tile::Hero(_) => {
-						for n in cur.neighbors().iter() {
-							if !seen.contains(n) {
-								queue.push_back((*n, dist + 1, dir));
-								seen.insert(cur);
-							}
-						}
-					},
-					_ => (),
-				}
-			}
-			
-			self.mine_dist.insert(*pos, result);
-		}
-		
-		for &(mpos, mdist, mdir) in self.mine_dist[pos].iter() {
-			match s.game.board.tile_at(&mpos) {
-				Tile::Mine(x) if x != player_id => return (mdist, mdir),
-				_ => (),
-			}
-		}
-		
-		(0, "Stay")
-	}
-	
-	fn initialize(&mut self, s : &State) {
-		let mut queue = VecDeque::new();
-		
-		for x in 0..s.game.board.size {
-			for y in 0..s.game.board.size {
-				match s.game.board.tile_at(&Position{x: x, y: y}) {
-					Tile::Tavern => {
-						queue.push_back(Position{x: x, y: y});
-						self.tavern_dist.insert(Position{x: x, y: y}, 0u8);
-					},
-					_ => (),
-				}
-			}
-		}
-		
-		while !queue.is_empty() {
-			let cur = queue.pop_front().unwrap();
-			
-			for n in cur.neighbors().iter() {
-				if !self.tavern_dist.contains_key(n) {
-					match s.game.board.tile_at(n) {
-					Tile::Air | Tile::Hero(_) => {
-							let dist = self.tavern_dist[&cur] + 1u8;
-							self.tavern_dist.insert(*n, dist);
-							queue.push_back(*n);
-						}
-						_ => (),
-					}
-				}
-			}
-		}
-	
-		self.initialized = true;
-	}
 
-    pub fn choose_move(&mut self, s : &State) -> &'static str {
-        let end_time = time::get_time() + time::Duration::milliseconds(800);
-		
-		if !self.initialized {
-			self.initialize(s);
-		}
-		
-        let mut hasher = SipHasher::new();
-        s.hash(&mut hasher);
-        let root_hash = hasher.finish();
-		let mut count = 0;
+    fn get_closest_tavern(&self, pos : &Position) -> (u8, &'static str) {
+        let mut min_dist = 255u8;
+        let mut min_dir = "Stay";
 
-        while time::get_time() < end_time {
-            let result = self.mcts(&mut s.clone(), 64);
-			
-			let new_scores = [
-				result[0] + self.nodes[&root_hash].scores[0],
-				result[1] + self.nodes[&root_hash].scores[1],
-				result[2] + self.nodes[&root_hash].scores[2],
-				result[3] + self.nodes[&root_hash].scores[3]				
-			];
-			
-			let new_visits = 1f32 + self.nodes[&root_hash].visits;
-			
-			self.nodes.insert(root_hash, Box::new(Node{
-				scores: new_scores,
-				visits: new_visits,
-			}));
-			
-			count += 1;
-        }
-
-		println!("Count: {}", count);
-		
-        let mut max_visits : f32 = 0f32;
-        let mut best_dir : &'static str = "Stay";
-		for mv in s.get_moves() {
-			let mut st = s.clone();
-			st.make_move(mv);
-			let mut st_hasher = SipHasher::new();
-			st.hash(&mut st_hasher);
-			let st_hash = st_hasher.finish();
-			
-			if self.nodes.contains_key(&st_hash) {
-				println!("Visits: {}", self.nodes[&st_hash].visits);
-				if self.nodes[&st_hash].visits > max_visits {
-					max_visits = self.nodes[&st_hash].visits;
-					best_dir = mv;
-				}
-			}
-		}
-	
-        best_dir
-    }
-
-    pub fn playout(&self, s : &mut State) -> [f32; 4] {
-        while !s.get_moves().is_empty() {
-			let moves = s.get_moves();
-			let (_, tdir) = self.get_closest_tavern(&s.game.heroes[s.game.turn%4].pos);
-			let (mdist, mdir) = self.get_closest_tavern(&s.game.heroes[s.game.turn%4].pos);
-			let mut mv;
-			
-			if rand::thread_rng().next_f32() < 0.1 {
-				mv = rand::thread_rng().choose(&moves).unwrap();
-			} else {
-				if s.game.heroes[s.game.turn % 4].life - mdist < 20 {
-					mv = &tdir;
-				} else {
-					mv = &mdir;
-				}
-			}
-            s.make_move(mv);
-        }
-
-        let mut result = [0f32, 0f32, 0f32, 0f32];
-        result[0] = s.game.heroes[0].gold as f32 * 35f32 + s.game.heroes[0].life as f32;
-		result[1] = s.game.heroes[1].gold as f32 * 35f32 + s.game.heroes[1].life as f32;
-		result[2] = s.game.heroes[2].gold as f32 * 35f32 + s.game.heroes[2].life as f32;
-		result[3] = s.game.heroes[3].gold as f32 * 35f32 + s.game.heroes[3].life as f32;
-		result[0] /= 350100f32;
-		result[1] /= 350100f32;
-		result[2] /= 350100f32;		
-		result[3] /= 350100f32;       
-
-        result
-    }
-
-    pub fn mcts(&mut self, s : &mut State, depth : u8) -> [f32; 4	] {
-		let mut result = [0f32, 0f32, 0f32, 0f32];
-        let mut hasher = SipHasher::new();
-        s.hash(&mut hasher);
-        let node_hash = hasher.finish();
-
-        if !self.nodes.contains_key(&node_hash) {           
-            result = self.playout(s);
-			self.nodes.insert(node_hash, Box::new(Node{
-                scores: result,
-                visits: 1f32,
-            }))	;
-            return result;
-        }
-
-        let mut max_score : f32 = 0f32;
-        let mut max_move = "Stay";
-        for mv in s.get_moves() {
-            let mut st = s.clone();
-            st.make_move(mv);
-            let mut st_hasher = SipHasher::new();
-            st.hash(&mut st_hasher);
-            let st_hash = st_hasher.finish();
-			
-			let mut xavg = 0f32;
-			let mut visits = 0f32;
-			
-			if self.nodes.contains_key(&st_hash) {
-				xavg = self.nodes[&st_hash].scores[s.game.turn % 4];
-				visits = self.nodes[&st_hash].visits;
-			} 
-			
-			let mut sort_score : f32;
-			
-			if visits == 0f32 {
-				sort_score = 10000f32 + rand::thread_rng().next_f32();
-			} else {
-			//let turns_left = (st.game.max_turns - st.game.turn) / 4;
-			//let heuristic = (st.game.heroes[s.game.turn % 4].gold as f32 + turns_left as f32 * st.game.heroes[s.game.turn % 4].mine_count as f32) / 10000f32;
-			
-             sort_score = xavg + 1.4f32 *(self.nodes[&node_hash].visits.ln() / visits).sqrt(); // + heuristic / (1f32 + visits);
-			}
-
-            if sort_score > max_score {
-                max_score = sort_score;
-                max_move = mv;
+        for mv in ["North", "East", "South", "West"].iter() {
+            let t = pos.neighbor(mv);
+            if self.tavern_dist.contains_key(&t) {
+                let dist = self.tavern_dist[&t];
+                if dist < min_dist {
+                    min_dist = dist;
+                    min_dir = mv;
+                }
             }
         }
 
-        s.make_move(max_move);
-		if depth > 0 {
-			result = self.mcts(s, depth - 1);
-		} else {
-			result = self.playout(s);
+        (min_dist + 1, min_dir)
+    }
+
+    fn get_closest_mine(&mut self, pos : &Position, player_id : usize, s : &State) -> (u8, &'static str) {
+        if !self.mine_dist.contains_key(pos) {
+            let mut queue = VecDeque::new();
+            let mut seen = HashSet::new();
+            let mut result = Vec::new();
+
+            seen.insert(*pos);
+            queue.push_back((pos.neighbor("North"), 1, "North"));
+            queue.push_back((pos.neighbor("East"), 1, "East"));
+            queue.push_back((pos.neighbor("South"), 1, "South"));
+            queue.push_back((pos.neighbor("West"), 1, "West"));
+
+            while !queue.is_empty() {
+                let (cur, dist, dir) = queue.pop_front().unwrap();
+
+                match s.game.board.tile_at(&cur) {
+                    Tile::Mine(_) => {
+                        result.push((cur, dist, dir));
+                    }
+                    Tile::Air | Tile::Hero(_) => {
+                        for n in cur.neighbors().iter() {
+                            if !seen.contains(n) {
+                                queue.push_back((*n, dist + 1, dir));
+                                seen.insert(cur);
+                            }
+                        }
+                    },
+                    _ => (),
+                }
+            }
+
+            self.mine_dist.insert(*pos, result);
+        }
+
+        for &(mpos, mdist, mdir) in self.mine_dist[pos].iter() {
+            match s.game.board.tile_at(&mpos) {
+                Tile::Mine(x) if x != player_id => return (mdist, mdir),
+                _ => (),
+            }
+        }
+
+        (0, "Stay")
+    }
+
+    fn initialize(&mut self, s : &State) {
+        let mut queue = VecDeque::new();
+
+        for x in 0..s.game.board.size {
+            for y in 0..s.game.board.size {
+                match s.game.board.tile_at(&Position{x: x, y: y}) {
+                    Tile::Tavern => {
+                        queue.push_back(Position{x: x, y: y});
+                        self.tavern_dist.insert(Position{x: x, y: y}, 0u8);
+                    },
+                    _ => (),
+                }
+            }
+        }
+
+        while !queue.is_empty() {
+            let cur = queue.pop_front().unwrap();
+
+            for n in cur.neighbors().iter() {
+                if !self.tavern_dist.contains_key(n) {
+                    match s.game.board.tile_at(n) {
+                        Tile::Air | Tile::Hero(_) => {
+                            let dist = self.tavern_dist[&cur] + 1u8;
+                            self.tavern_dist.insert(*n, dist);
+                            queue.push_back(*n);
+                        }
+                        _ => (),
+                    }
+                }
+            }
+        }
+
+        self.initialized = true;
+    }
+
+    fn eval(&mut self, s : &State, t : Turn) -> f32 {
+        let turns_left = (s.game.max_turns - s.game.turn) / 4;
+        let mut pred_gold = (s.hero.gold as usize + s.hero.mine_count as usize * turns_left as usize) + s.hero.life as usize / 10;
+		let mut neg_gold = 0 as usize;
+		
+		for h in s.game.heroes.iter() {
+			if h.name == s.hero.name {
+				continue;
+			}
+			
+			let hero_gold = h.gold as usize + (1 + h.mine_count as usize) * turns_left;
+	
+			neg_gold += hero_gold;			
 		}
 		
-		let new_scores = [
-			result[0] + self.nodes[&node_hash].scores[0],
-			result[1] + self.nodes[&node_hash].scores[1],
-			result[2] + self.nodes[&node_hash].scores[2],
-			result[3] + self.nodes[&node_hash].scores[3],
-		];
+		for h in s.game.heroes.iter() {
+			if h.name == s.hero.name {
+				continue;
+			}
+			
+			if h.pos.manhattan_distance(&s.hero.pos) == 1 {
+				neg_gold += 25;
+			}
+		}
 		
-		let new_visits = 1f32 + self.nodes[&node_hash].visits;
 		
-		self.nodes.insert(node_hash, Box::new(Node{
-			scores: new_scores,
-			visits: new_visits,
-		}));
 		
-        result
+		let (mdist, mdir) = self.get_closest_mine(&s.hero.pos, s.hero.id, s);
+        let mut delay = 0 as usize;
+        if mdist > 0 {
+            if s.hero.life < mdist || s.hero.life - mdist <= 20 {
+                let (tdist, _) = self.get_closest_tavern(&s.hero.pos);
+                delay += 2*tdist as usize;
+            }
+            delay += mdist as usize;
+        } else {
+            let (tdist, _) = self.get_closest_tavern(&s.hero.pos);
+            delay += tdist as usize;
+        }
+
+        if delay < turns_left {
+           pred_gold += 1 * (turns_left - delay);
+        }
+		
+		
+		(3f32 * pred_gold as f32 - neg_gold as f32)
+		//(pred_gold as f32 - delay as f32)
+    }
+
+    fn brs(&mut self, s : &State, alphao : f32, betao : f32, depth : u8, turn : Turn, end_time : time::Timespec, nodes : &mut u64) -> Option<f32> {
+		let mut alpha = alphao;
+		let mut beta = betao;
+		let mut bmove = "Stay";
+		let mut have_hash_move = false;
+		let mut bscore = -1000000f32;
+		let mut g : f32;
+		let mut a : f32;
+		let mut b : f32;
+	
+		let mut sh = FnvHasher::default();
+		s.hash(&mut sh);
+		let hash = sh.finish();
+		let entry = self.tt.probe(hash);
+		
+		if entry.is_some() {
+			let e = entry.unwrap();
+			if e.turn >= depth as u16 {
+			
+			have_hash_move = true;
+			bmove = e.mv;
+			//bscore = e.lower;
+			
+			if e.lower >= beta {
+				return Some(e.lower);
+			}
+			if e.upper <= alpha {
+				return Some(e.upper);
+			}
+			
+			if e.lower > alpha {
+				alpha = e.lower;
+			}
+			
+			if e.upper < beta {
+				beta = e.upper;
+			}}
+		}
+		
+		if *nodes & 511u64 == 511 && time::get_time() > end_time {
+			return None;
+        }
+		
+		*nodes += 1;
+		
+        if depth == 0 || s.game.turn == s.game.max_turns {
+            g = self.eval(s, turn);
+        } else if turn == Turn::Max {		
+			g = -1000000f32;
+			a = alpha;
+			
+            let mut state = s.clone();
+			
+			// Try the hash move
+			if have_hash_move {
+				state.make_move(bmove);
+				let v = self.brs(&state, a, beta, depth - 1, Turn::Min, end_time, nodes);
+				if v.is_none() {
+					return None;
+				}
+				let score = v.unwrap();
+				if score > bscore {
+					bscore = score;
+				}
+				if score > g {
+					g = score;
+				}
+				if g > a {
+					a = g;
+				}
+			}
+			
+			let mut state = s.clone();
+            for mv in state.get_moves().iter() {			
+				if g >= beta {
+					break;
+				}
+				
+                state = s.clone();
+                state.make_move(mv);
+                let v = self.brs(&state, a, beta, depth - 1, Turn::Min, end_time, nodes);
+                if v.is_none() {
+                    return None;
+                }
+				let score = v.unwrap();
+				if score > bscore {
+					bmove = mv;
+					bscore = score;
+				}
+                if score > g {
+                    g =  score;
+                }
+				if g > a {
+					a = g;
+				}
+				
+				
+            }
+        } else {
+			g = 1000000f32;
+			b = beta;
+			
+            let mut state = s.clone();
+            // First player moves
+            for mv in state.get_moves().iter() {
+				if g <= alpha {
+					break;
+				}
+				
+				if *mv == "Stay" {
+					continue;
+				}
+				
+                state = s.clone();
+                state.make_move(mv);
+                state.make_move("Stay");
+                state.make_move("Stay");
+                let v = self.brs(&state, alpha, b, depth - 1, Turn::Max, end_time, nodes);
+				if v.is_none() {
+                    return None;
+                }
+                if v.unwrap() < g {
+                    g = v.unwrap();
+                }
+				if g < b {
+					b = g;
+				}
+            }
+
+            state = s.clone();
+            // Second player moves
+            state.make_move("Stay");
+            for mv in state.get_moves().iter() {
+				if g <= alpha {
+					break;
+				}
+				
+				if *mv == "Stay" {
+					continue;
+				}
+				
+                state = s.clone();
+                state.make_move("Stay");
+                state.make_move(mv);
+                state.make_move("Stay");
+                let v = self.brs(&state, alpha, b, depth - 1, Turn::Max, end_time, nodes);
+                if v.is_none() {
+                    return None;
+                }
+                if v.unwrap() < g {
+                    g = v.unwrap();
+                }
+				if g < b {
+					b = g;
+				}
+            }
+
+            state = s.clone();
+            state.make_move("Stay");
+            state.make_move("Stay");
+            for mv in state.get_moves().iter() {
+				if g <= alpha {
+					break;
+				}
+				
+				if *mv == "Stay" {
+					continue;
+				}
+				
+                state = s.clone();
+                state.make_move("Stay");
+                state.make_move("Stay");
+                state.make_move(mv);
+                let v = self.brs(&state, alpha, b, depth - 1, Turn::Max, end_time, nodes);
+                if v.is_none() {
+                    return None;
+                }
+                if v.unwrap() < g {
+                    g = v.unwrap();
+                }
+				if g < b {
+					b = g;
+				}
+            }
+        }
+		
+		let mut e = Entry::default();
+		if g <= alpha {
+			e.upper = g;
+			e.mv = bmove;
+		} 
+		if g > alpha && g < beta {
+			e.upper = g;
+			e.lower = g;
+			e.mv = bmove;
+		} 
+		if g >= beta {	
+			e.lower = g;
+			e.mv = bmove;
+		}
+		if e.lower == 0f32 {
+			e.lower = -1000000f32;
+		}
+		if e.upper == 0f32 {
+			e.upper = 1000000f32;
+		}
+		e.turn = depth as u16;
+		e.hash = hash;
+		e.age = s.game.turn as u16;
+		
+		self.tt.store(e);
+		
+		return Some(g);		
+    }
+	
+	pub fn mtdf(&mut self, s : &State, firstguess : f32, depth : u8, mut num_nodes : &mut u64, end_time : time::Timespec) -> Option<f32> {
+		let mut g = firstguess;
+		let mut upper = 1000000f32;
+		let mut lower = -1000000f32;
+		let mut beta : f32;
+		let mut direction = 1f32;
+		let mut step_size = 1f32;
+		loop {
+		
+		
+			if g == lower {
+				beta = g + step_size;
+			} else {
+				beta = g;
+			}
+			
+			let val = self.brs(s, beta - step_size, beta, depth, Turn::Max, end_time, &mut num_nodes);
+			
+			if val.is_none() {
+				return None;
+			}
+			g = val.unwrap();
+			
+			if g < beta {
+				if direction < 0f32 {
+					direction = 1f32;
+				} else {
+				    direction += 1f32;
+				}
+				upper = g;
+				step_size = direction;
+				if step_size > 5f32 {
+					step_size = 5f32;
+				}
+			} else {
+				if direction > 0f32 {
+					direction = -1f32;
+				} else {
+					direction -= 1f32;
+				}
+								
+				lower = g;
+				
+				step_size = -direction;
+				if step_size > 5f32 {
+					step_size = 5f32;
+				}
+			}
+			
+			if lower >= upper {
+				break;
+			}
+		}
+		
+		Some(g)
+	}
+
+    pub fn choose_move(&mut self, s : &State) -> &'static str {
+        let end_time = time::get_time() + time::Duration::milliseconds(750);
+
+        if !self.initialized {
+            self.initialize(s);
+			if time::get_time() + time::Duration::milliseconds(200) > end_time {
+				return "Stay";
+			}
+        }
+		
+		let mut depth = 0u8;
+		let mut num_nodes = 0u64;
+        let mut firstguess = self.eval(s, Turn::Max);
+		
+			let mut best_v = -1000000f32;
+		let mut best_u = -1000000f32;
+		let mut best_d = "Stay";
+		let mut prev_b = "Stay";
+
+        while time::get_time() < end_time && depth <= 32 {
+            depth += 1;
+			let v = self.mtdf(s, firstguess, depth, &mut num_nodes, end_time);
+			if v.is_some() {
+				firstguess = v.unwrap();
+						
+			let mut sh = FnvHasher::default();
+			s.hash(&mut sh);
+			let hash = sh.finish();
+		
+			let entry = self.tt.probe(hash);
+			if entry.is_some() {
+				let e = entry.unwrap();
+				println!("{}: [{}, {}], {}", e.mv, e.lower, e.upper, e.turn);
+				prev_b = best_d;
+				best_d = e.mv;
+//				if e.upper > best_v || (e.upper == best_v && e.lower > best_u){
+					
+//					best_d = mv;
+//					best_u = e.lower;
+//					best_v = e.upper;
+//					
+				//}
+//			}
+		//}
+
+			}
+        }
+	
+	
+		
+//		for mv in s.get_moves().iter() {
+//			let mut snext = s.clone();
+//			snext.make_move(mv);
+			
+			//let mut sh = FnvHasher::default();
+			//s.hash(&mut sh);
+			//let hash = sh.finish();
+		
+			//let entry = self.tt.probe(hash);
+			//if entry.is_some() {
+				//let e = entry.unwrap();
+				//println!("{}: [{}, {}], {}", e.mv, e.lower, e.upper, e.turn);
+				//best_d = e.mv;
+//				if e.upper > best_v || (e.upper == best_v && e.lower > best_u){
+//					best_d = mv;
+//					best_u = e.lower;
+//					best_v = e.upper;
+//					
+				}
+//			}
+		//}
+
+      
+        println!("{}, {} - {} - {} - {}, nodes: {}", depth, best_d, firstguess, end_time - time::get_time(), s.hero.life, num_nodes);
+
+        return best_d;
+
     }
 }

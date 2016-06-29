@@ -27,3 +27,15 @@ impl fmt::Display for Tile {
         }
     }
 }
+
+impl Tile {
+	pub fn to_usize(&self) -> usize {
+		match *self {
+			Tile::Wall => 0,
+			Tile::Air  => 1,
+			Tile::Tavern => 2,
+			Tile::Mine(x) => 3 + x as usize,
+			Tile::Hero(x) => 7 + x as usize,
+		}
+	}
+}

@@ -1,6 +1,8 @@
+use std::hash;
+
 use position::Position;
 
-#[derive(Clone, Deserialize, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct Hero {
     pub id: usize,
     pub name: String,
@@ -18,4 +20,17 @@ pub struct Hero {
 	#[serde(rename="spawnPos")]
     pub spawn_pos: Position,
     pub crashed: bool,
+}
+
+impl hash::Hash for Hero {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+		self.id.hash(state);
+		self.user_id.hash(state);
+		self.pos.hash(state);
+		
+		self.life.hash(state);
+		self.gold.hash(state);
+		self.mine_count.hash(state);
+		self.crashed.hash(state);
+    }
 }
