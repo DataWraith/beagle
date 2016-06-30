@@ -12,17 +12,6 @@ use tile::Tile;
 use transposition_table::{Table, Entry};
 use zobrist::ZobristTable;
 
-#[derive(Eq, PartialEq)]
-enum Turn {
-    Max,
-    Min,
-}
-
-struct Node {
-    scores: [f32; 4],
-    visits: f32,
-}
-
 pub struct Bot {
     initialized: bool,
 	tt: Table,
@@ -34,7 +23,7 @@ impl Bot {
     pub fn new() -> Bot {
         Bot{
             initialized: false,
-            tt: Table::new(100000u64),
+            tt: Table::new(1000000u64),
 			tavern_dist: HashMap::new(),
             mine_dist: HashMap::new(),
         }
@@ -58,7 +47,7 @@ impl Bot {
         (min_dist + 1, min_dir)
     }
 
-    fn get_closest_mine(&mut self, pos : &Position, player_id : usize, s : &State) -> (u8, &'static str) {
+    fn get_closest_mine(&mut self, pos : &Position, player_id : usize, s : &Box<State>) -> (u8, &'static str) {
         if !self.mine_dist.contains_key(pos) {
             let mut queue = VecDeque::new();
             let mut seen = HashSet::new();
@@ -102,7 +91,7 @@ impl Bot {
         (0, "Stay")
     }
 
-    fn initialize(&mut self, s : &State) {
+    fn initialize(&mut self, s : &Box<State>) {
         let mut queue = VecDeque::new();
 
         for x in 0..s.game.board.size {
@@ -137,7 +126,7 @@ impl Bot {
         self.initialized = true;
     }
 
-    fn eval(&mut self, s : &State, t : Turn) -> f32 {
+    fn eval(&mut self, s : &Box<State>) -> f32 {
         let turns_left = (s.game.max_turns - s.game.turn) / 4;
         let mut pred_gold = (s.hero.gold as usize + s.hero.mine_count as usize * turns_left as usize) + s.hero.life as usize / 10;
 		let mut neg_gold = 0 as usize;
@@ -186,7 +175,7 @@ impl Bot {
 		//(pred_gold as f32 - delay as f32)
     }
 
-    fn brs(&mut self, s : &State, alphao : f32, betao : f32, depth : u8, turn : Turn, end_time : time::Timespec, nodes : &mut u64) -> Option<f32> {
+    fn brs(&mut self, s : &Box<State>, alphao : f32, betao : f32, depth : u8, end_time : time::Timespec, nodes : &mut u64) -> Option<f32> {
 		let mut alpha = alphao;
 		let mut beta = betao;
 		let mut bmove = "Stay";
@@ -225,15 +214,15 @@ impl Bot {
 			}}
 		}
 		
-		if *nodes & 511u64 == 511 && time::get_time() > end_time {
+		if (*nodes < 10u64 || *nodes & 511u64 == 511) && time::get_time() > end_time {
 			return None;
         }
 		
 		*nodes += 1;
 		
         if depth == 0 || s.game.turn == s.game.max_turns {
-            g = self.eval(s, turn);
-        } else if turn == Turn::Max {		
+            g = self.eval(&s);
+        } else if s.game.turn % 4 == s.hero.id - 1 {		
 			g = -1000000f32;
 			a = alpha;
 			
@@ -242,7 +231,7 @@ impl Bot {
 			// Try the hash move
 			if have_hash_move {
 				state.make_move(bmove);
-				let v = self.brs(&state, a, beta, depth - 1, Turn::Min, end_time, nodes);
+				let v = self.brs(&state, a, beta, depth - 1, end_time, nodes);
 				if v.is_none() {
 					return None;
 				}
@@ -266,7 +255,7 @@ impl Bot {
 				
                 state = s.clone();
                 state.make_move(mv);
-                let v = self.brs(&state, a, beta, depth - 1, Turn::Min, end_time, nodes);
+                let v = self.brs(&state, a, beta, depth - 1, end_time, nodes);
                 if v.is_none() {
                     return None;
                 }
@@ -303,7 +292,7 @@ impl Bot {
                 state.make_move(mv);
                 state.make_move("Stay");
                 state.make_move("Stay");
-                let v = self.brs(&state, alpha, b, depth - 1, Turn::Max, end_time, nodes);
+                let v = self.brs(&state, alpha, b, depth - 1, end_time, nodes);
 				if v.is_none() {
                     return None;
                 }
@@ -331,7 +320,7 @@ impl Bot {
                 state.make_move("Stay");
                 state.make_move(mv);
                 state.make_move("Stay");
-                let v = self.brs(&state, alpha, b, depth - 1, Turn::Max, end_time, nodes);
+                let v = self.brs(&state, alpha, b, depth - 1, end_time, nodes);
                 if v.is_none() {
                     return None;
                 }
@@ -359,7 +348,7 @@ impl Bot {
                 state.make_move("Stay");
                 state.make_move("Stay");
                 state.make_move(mv);
-                let v = self.brs(&state, alpha, b, depth - 1, Turn::Max, end_time, nodes);
+                let v = self.brs(&state, alpha, b, depth - 1, end_time, nodes);
                 if v.is_none() {
                     return None;
                 }
@@ -401,7 +390,7 @@ impl Bot {
 		return Some(g);		
     }
 	
-	pub fn mtdf(&mut self, s : &State, firstguess : f32, depth : u8, mut num_nodes : &mut u64, end_time : time::Timespec) -> Option<f32> {
+	pub fn mtdf(&mut self, s : &Box<State>, firstguess : f32, depth : u8, mut num_nodes : &mut u64, end_time : time::Timespec) -> Option<f32> {
 		let mut g = firstguess;
 		let mut upper = 1000000f32;
 		let mut lower = -1000000f32;
@@ -417,7 +406,7 @@ impl Bot {
 				beta = g;
 			}
 			
-			let val = self.brs(s, beta - step_size, beta, depth, Turn::Max, end_time, &mut num_nodes);
+			let val = self.brs(s, beta - step_size, beta, depth, end_time, &mut num_nodes);
 			
 			if val.is_none() {
 				return None;
@@ -432,8 +421,8 @@ impl Bot {
 				}
 				upper = g;
 				step_size = direction;
-				if step_size > 5f32 {
-					step_size = 5f32;
+				if step_size > 10f32 {
+					step_size = 10f32;
 				}
 			} else {
 				if direction > 0f32 {
@@ -445,8 +434,8 @@ impl Bot {
 				lower = g;
 				
 				step_size = -direction;
-				if step_size > 5f32 {
-					step_size = 5f32;
+				if step_size > 10f32 {
+					step_size = 10f32;
 				}
 			}
 			
@@ -458,7 +447,7 @@ impl Bot {
 		Some(g)
 	}
 
-    pub fn choose_move(&mut self, s : &State) -> &'static str {
+    pub fn choose_move(&mut self, s : &Box<State>) -> &'static str {
         let end_time = time::get_time() + time::Duration::milliseconds(750);
 
         if !self.initialized {
@@ -470,7 +459,7 @@ impl Bot {
 		
 		let mut depth = 0u8;
 		let mut num_nodes = 0u64;
-        let mut firstguess = self.eval(s, Turn::Max);
+        let mut firstguess = self.eval(s);
 		
 			let mut best_v = -1000000f32;
 		let mut best_u = -1000000f32;

@@ -1,4 +1,4 @@
-#![feature(custom_derive, plugin)]
+#![feature(custom_derive, plugin, box_patterns)]
 #![plugin(serde_macros)]
 
 extern crate time;
@@ -43,7 +43,7 @@ fn main() {
 
 	res.read_to_string(&mut body).ok();
 
-    let mut state : state::State = serde_json::from_str(&body).unwrap();
+    let mut state : Box<state::State> = serde_json::from_str(&body).unwrap();
     state.game.board.initialize();
 
     let mut new_state = state.clone();

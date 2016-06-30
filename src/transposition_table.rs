@@ -1,4 +1,5 @@
 
+ 
 #[derive(Default, Clone)]
 pub struct Entry {
 	pub mv: &'static str,
@@ -11,8 +12,8 @@ pub struct Entry {
 
 pub struct Table {
 	num_entries : u64,
-	always: Vec<Entry>,
-	depthpref: Vec<Entry>,
+	always: Vec<Box<Entry>>,
+	depthpref: Vec<Box<Entry>>,
 }
 
 impl Table {
@@ -23,8 +24,8 @@ impl Table {
 		
 		Table{
 			num_entries: num_entries / 2,
-			always: vec![Entry::default(); (num_entries / 2) as usize],
-			depthpref: vec![Entry::default(); (num_entries / 2) as usize],
+			always: vec![Box::new(Entry::default()); (num_entries / 2) as usize],
+			depthpref: vec![Box::new(Entry::default()); (num_entries / 2) as usize],
 		}
 	}
 	
@@ -32,11 +33,13 @@ impl Table {
 		let idx = (hash % self.num_entries) as usize;
 		
 		if self.depthpref[idx].hash == hash {
-			return Some(self.depthpref[idx].clone());
+			let box ret = self.depthpref[idx].clone();
+			return Some(ret);
 		}
 			
 		if self.always[idx].hash == hash {
-			return Some(self.always[idx].clone());
+			let box ret = self.always[idx].clone();
+			return Some(ret);
 		}
 		
 		
@@ -47,10 +50,21 @@ impl Table {
 		let idx = (e.hash % self.num_entries) as usize;
 		
 		if self.depthpref[idx].turn <= e.turn || self.depthpref[idx].age + 15 < e.age {
-			self.depthpref[idx] = e;
+			self.depthpref[idx].mv = e.mv;
+			self.depthpref[idx].hash = e.hash;
+			self.depthpref[idx].lower = e.lower;
+			self.depthpref[idx].upper = e.upper;
+			self.depthpref[idx].turn = e.turn;
+			self.depthpref[idx].age = e.age;
+			
 			return;
 		}
 		
-		self.always[idx] = e;
+		self.always[idx].mv = e.mv;
+		self.always[idx].hash = e.hash;
+		self.always[idx].lower = e.lower;
+		self.always[idx].upper = e.upper;
+		self.always[idx].turn = e.turn;
+		self.always[idx].age = e.age;
 	}
 }
