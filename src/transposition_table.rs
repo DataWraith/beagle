@@ -4,8 +4,8 @@
 pub struct Entry {
 	pub mv: &'static str,
 	pub hash: u64,
-	pub lower: f32,
-	pub upper: f32,
+	pub lower: i32,
+	pub upper: i32,
 	pub turn: u16,
 	pub age: u16,
 }

@@ -126,7 +126,7 @@ impl Bot {
         self.initialized = true;
     }
 
-    fn eval(&mut self, s : &Box<State>) -> f32 {
+    fn eval(&mut self, s : &Box<State>) -> i32 {
         let turns_left = (s.game.max_turns - s.game.turn) / 4;
         let mut pred_gold = (s.hero.gold as usize + s.hero.mine_count as usize * turns_left as usize) + s.hero.life as usize / 10;
 		let mut neg_gold = 0 as usize;
@@ -171,19 +171,18 @@ impl Bot {
         }
 		
 		
-		(3f32 * pred_gold as f32 - neg_gold as f32)
-		//(pred_gold as f32 - delay as f32)
+		(3i32 * pred_gold as i32 - neg_gold as i32)
     }
 
-    fn brs(&mut self, s : &Box<State>, alphao : f32, betao : f32, depth : u8, end_time : time::Timespec, nodes : &mut u64) -> Option<f32> {
+    fn brs(&mut self, s : &Box<State>, alphao : i32, betao : i32, depth : u8, end_time : time::Timespec, nodes : &mut u64) -> Option<i32> {
 		let mut alpha = alphao;
 		let mut beta = betao;
 		let mut bmove = "Stay";
 		let mut have_hash_move = false;
-		let mut bscore = -1000000f32;
-		let mut g : f32;
-		let mut a : f32;
-		let mut b : f32;
+		let mut bscore = i32::min_value();
+		let mut g : i32;
+		let mut a : i32;
+		let mut b : i32;
 	
 		let mut sh = FnvHasher::default();
 		s.hash(&mut sh);
@@ -223,7 +222,7 @@ impl Bot {
         if depth == 0 || s.game.turn == s.game.max_turns {
             g = self.eval(&s);
         } else if s.game.turn % 4 == s.hero.id - 1 {		
-			g = -1000000f32;
+			g = i32::min_value();
 			a = alpha;
 			
             let mut state = s.clone();
@@ -274,7 +273,7 @@ impl Bot {
 				
             }
         } else {
-			g = 1000000f32;
+			g = i32::max_value();
 			b = beta;
 			
             let mut state = s.clone();
@@ -364,6 +363,7 @@ impl Bot {
 		let mut e = Entry::default();
 		if g <= alpha {
 			e.upper = g;
+			e.lower = i32::min_value();
 			e.mv = bmove;
 		} 
 		if g > alpha && g < beta {
@@ -373,14 +373,10 @@ impl Bot {
 		} 
 		if g >= beta {	
 			e.lower = g;
+			e.upper = i32::max_value();
 			e.mv = bmove;
 		}
-		if e.lower == 0f32 {
-			e.lower = -1000000f32;
-		}
-		if e.upper == 0f32 {
-			e.upper = 1000000f32;
-		}
+		
 		e.turn = depth as u16;
 		e.hash = hash;
 		e.age = s.game.turn as u16;
@@ -390,16 +386,14 @@ impl Bot {
 		return Some(g);		
     }
 	
-	pub fn mtdf(&mut self, s : &Box<State>, firstguess : f32, depth : u8, mut num_nodes : &mut u64, end_time : time::Timespec) -> Option<f32> {
+	pub fn mtdf(&mut self, s : &Box<State>, firstguess : i32, depth : u8, mut num_nodes : &mut u64, end_time : time::Timespec) -> Option<i32> {
 		let mut g = firstguess;
-		let mut upper = 1000000f32;
-		let mut lower = -1000000f32;
-		let mut beta : f32;
-		let mut direction = 1f32;
-		let mut step_size = 1f32;
+		let mut upper = i32::max_value();
+		let mut lower = i32::min_value();
+		let mut beta : i32;
+		let mut direction = 1i32;
+		let mut step_size = 1i32;
 		loop {
-		
-		
 			if g == lower {
 				beta = g + step_size;
 			} else {
@@ -414,28 +408,28 @@ impl Bot {
 			g = val.unwrap();
 			
 			if g < beta {
-				if direction < 0f32 {
-					direction = 1f32;
+				if direction < 0i32 {
+					direction = 1i32;
 				} else {
-				    direction += 1f32;
+				    direction += 1i32;
 				}
 				upper = g;
 				step_size = direction;
-				if step_size > 10f32 {
-					step_size = 10f32;
+				if step_size > 10i32 {
+					step_size = 10i32;
 				}
 			} else {
-				if direction > 0f32 {
-					direction = -1f32;
+				if direction > 0i32 {
+					direction = -1i32;
 				} else {
-					direction -= 1f32;
+					direction -= 1i32;
 				}
 								
 				lower = g;
 				
 				step_size = -direction;
-				if step_size > 10f32 {
-					step_size = 10f32;
+				if step_size > 10i32 {
+					step_size = 10i32;
 				}
 			}
 			
@@ -461,8 +455,8 @@ impl Bot {
 		let mut num_nodes = 0u64;
         let mut firstguess = self.eval(s);
 		
-			let mut best_v = -1000000f32;
-		let mut best_u = -1000000f32;
+		let mut best_v = i32::min_value();
+		let mut best_u = i32::min_value();
 		let mut best_d = "Stay";
 		let mut prev_b = "Stay";
 
@@ -482,42 +476,14 @@ impl Bot {
 				println!("{}: [{}, {}], {}", e.mv, e.lower, e.upper, e.turn);
 				prev_b = best_d;
 				best_d = e.mv;
-//				if e.upper > best_v || (e.upper == best_v && e.lower > best_u){
-					
-//					best_d = mv;
-//					best_u = e.lower;
-//					best_v = e.upper;
-//					
-				//}
-//			}
-		//}
-
 			}
         }
-	
+		
 	
 		
-//		for mv in s.get_moves().iter() {
-//			let mut snext = s.clone();
-//			snext.make_move(mv);
-			
-			//let mut sh = FnvHasher::default();
-			//s.hash(&mut sh);
-			//let hash = sh.finish();
-		
-			//let entry = self.tt.probe(hash);
-			//if entry.is_some() {
-				//let e = entry.unwrap();
-				//println!("{}: [{}, {}], {}", e.mv, e.lower, e.upper, e.turn);
-				//best_d = e.mv;
-//				if e.upper > best_v || (e.upper == best_v && e.lower > best_u){
-//					best_d = mv;
-//					best_u = e.lower;
-//					best_v = e.upper;
-//					
+				
 				}
-//			}
-		//}
+
 
       
         println!("{}, {} - {} - {} - {}, nodes: {}", depth, best_d, firstguess, end_time - time::get_time(), s.hero.life, num_nodes);
