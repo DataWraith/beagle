@@ -1,3 +1,5 @@
+use direction::Direction;
+
 #[derive(Clone, Copy, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub struct Position {
     pub x: i8,
@@ -5,14 +7,13 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn neighbor(&self, dir : &str) -> Position {
+    pub fn neighbor(&self, dir : Direction) -> Position {
         match dir {
-            "North" => Position{x: self.x - 1, y: self.y},
-            "East"  => Position{x: self.x, y: self.y + 1},
-            "South" => Position{x: self.x + 1, y: self.y},
-            "West"  => Position{x: self.x, y: self.y - 1},
-            "Stay"  => Position{x: self.x, y: self.y},
-            _ => panic!("Invalid direction: {}", dir),
+            Direction::North => Position{x: self.x - 1, y: self.y},
+            Direction::East  => Position{x: self.x, y: self.y + 1},
+            Direction::South => Position{x: self.x + 1, y: self.y},
+            Direction::West  => Position{x: self.x, y: self.y - 1},
+            Direction::Stay  => Position{x: self.x, y: self.y},
         }
     }
 

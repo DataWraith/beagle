@@ -3,6 +3,7 @@ use std::hash;
 use game::Game;
 use hero::Hero;
 use tile::Tile;
+use direction::Direction;
 
 #[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct State {
@@ -65,8 +66,8 @@ impl State {
         self.game.heroes[hero_id - 1].life = 100;
     }
 
-    pub fn get_moves(&self) -> Vec<&'static str> {
-        let mut result : Vec<&'static str> = vec![];
+    pub fn get_moves(&self) -> Vec<Direction> {
+        let mut result : Vec<Direction> = Vec::with_capacity(5);
         let ref h = self.game.heroes[self.game.turn % 4];
 
         if self.game.turn > self.game.max_turns {
@@ -74,30 +75,30 @@ impl State {
         }
 
         if h.crashed {
-            result.push("Stay");
+            result.push(Direction::Stay);
             return result;
         }
 
-        for dir in ["North", "East", "South", "West"].iter() {
-            let t = self.game.board.tile_at(&self.game.heroes[self.game.turn%4].pos.neighbor(dir));
+        for dir in [Direction::North, Direction::East, Direction::South, Direction::West].iter() {
+            let t = self.game.board.tile_at(&self.game.heroes[self.game.turn%4].pos.neighbor(*dir));
 
             match t {
                 Tile::Wall => (),
-                Tile::Air => result.push(dir),
+                Tile::Air => result.push(*dir),
                 Tile::Mine(x) if x == h.id => (),
-                Tile::Mine(x) => result.push(dir),
+                Tile::Mine(x) => result.push(*dir),
                 Tile::Tavern => if h.gold >= 2 {
-                    result.push(dir);
+                    result.push(*dir);
                 },
                 Tile::Hero(_) => (),
             }
         }
 
-        result.push("Stay");
+        result.push(Direction::Stay);
         result
     }
 
-    pub fn make_move(&mut self, direction : &str) {
+    pub fn make_move(&mut self, direction : Direction) {
         let h_idx = (self.game.turn % 4) as usize;
         let mut hero_died = false;
         //println!("Turn {}: {}, ({})", self.game.turn, direction, h_idx + 1);
@@ -154,7 +155,9 @@ impl State {
             self.game.heroes[h_idx].life -= 1;
         }
 
-        self.game.heroes[h_idx].last_dir = String::from(direction);
+		let ldir : &'static str = direction.into();
+		
+        self.game.heroes[h_idx].last_dir = String::from(ldir);
         self.hero = self.game.heroes[self.hero.id - 1].clone();
         self.game.turn += 1;
 

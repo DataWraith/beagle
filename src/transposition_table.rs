@@ -1,8 +1,9 @@
-
+use direction::Direction;
+use mv::Move;
  
 #[derive(Default, Clone)]
 pub struct Entry {
-	pub mv: &'static str,
+	pub mv: Move,
 	pub hash: u64,
 	pub lower: i32,
 	pub upper: i32,

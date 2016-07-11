@@ -7,6 +7,8 @@ extern crate serde_json;
 extern crate hyper;
 extern crate fnv;
 
+mod direction;
+mod mv;
 mod state;
 mod game;
 mod hero;
@@ -17,6 +19,7 @@ mod bot;
 mod transposition_table;
 mod zobrist;
 
+use direction::Direction;
 use std::io::Read;
 //use std::hash::{Hash, Hasher, SipHasher};
 use hyper::client::*;
@@ -29,7 +32,7 @@ fn main() {
 	}
     let mut bot = bot::Bot::new();
     let client = Client::new();
-	let mut res = client.post("http://vindinium.org/api/arena	")
+	let mut res = client.post("http://vindinium.org/api/arena")
 		.header(ContentType("application/x-www-form-urlencoded".parse().unwrap()))
 		.body("key=eqwxqpa8")
 		.send()
@@ -54,7 +57,7 @@ fn main() {
 		
 		res = client.post(Url::parse(&state.play_url).unwrap())
 			.header(ContentType("application/x-www-form-urlencoded".parse().unwrap()))
-			.body(&(String::from("key=eqwxqpa8&dir=") + mv))
+			.body(&(String::from("key=eqwxqpa8&dir=") + mv.into()))
 			.send()
 			.unwrap();
 
@@ -83,7 +86,14 @@ fn main() {
         let h_idx = new_state.game.turn % 4;
         for i in 1..4 {
             let ref mv = new_state.game.heroes[(h_idx + i) % 4].last_dir;
-            state.make_move(&mv);
+            match mv.as_ref() {
+				"North" => state.make_move(Direction::North),
+				"East" => state.make_move(Direction::East),
+				"South" => state.make_move(Direction::South),
+				"West" => state.make_move(Direction::West),
+				"Stay" => state.make_move(Direction::Stay),
+				_ => unreachable!(),
+			}
         }}
 		
 		//println!("{}", state.game.board);
