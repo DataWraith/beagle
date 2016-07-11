@@ -35,7 +35,7 @@ impl State {
         self.game.heroes[hero_id - 1].mine_count = 0;
 
         let mut mpos = vec![];
-        for pos in self.game.board.mine_pos.iter() {
+        for pos in &self.game.board.mine_pos {
             match self.game.board.tile_at(pos) {
                 Tile::Mine(hid) if hid == hero_id => mpos.push(pos.clone()),
                 _ => (),
@@ -57,18 +57,18 @@ impl State {
             }
         }
 
-        let ref old_pos = self.game.heroes[hero_id - 1].pos.clone();
-        let ref new_pos = self.game.heroes[hero_id - 1].spawn_pos.clone();
+        let old_pos = &self.game.heroes[hero_id - 1].pos.clone();
+        let new_pos = &self.game.heroes[hero_id - 1].spawn_pos.clone();
 
         self.game.board.put_tile(old_pos, Tile::Air);
         self.game.board.put_tile(new_pos, Tile::Hero(hero_id));
-        self.game.heroes[hero_id - 1].pos = new_pos.clone();
+        self.game.heroes[hero_id - 1].pos = *new_pos;
         self.game.heroes[hero_id - 1].life = 100;
     }
 
     pub fn get_moves(&self) -> Vec<Direction> {
         let mut result : Vec<Direction> = Vec::with_capacity(5);
-        let ref h = self.game.heroes[self.game.turn % 4];
+        let h = &self.game.heroes[self.game.turn % 4];
 
         if self.game.turn > self.game.max_turns {
             return result;
@@ -79,18 +79,16 @@ impl State {
             return result;
         }
 
-        for dir in [Direction::North, Direction::East, Direction::South, Direction::West].iter() {
+        for dir in &[Direction::North, Direction::East, Direction::South, Direction::West] {
             let t = self.game.board.tile_at(&self.game.heroes[self.game.turn%4].pos.neighbor(*dir));
 
             match t {
-                Tile::Wall => (),
-                Tile::Air => result.push(*dir),
+                Tile::Wall | Tile::Hero(_) => (),               
                 Tile::Mine(x) if x == h.id => (),
-                Tile::Mine(x) => result.push(*dir),
+                Tile::Air | Tile::Mine(_) => result.push(*dir),
                 Tile::Tavern => if h.gold >= 2 {
                     result.push(*dir);
-                },
-                Tile::Hero(_) => (),
+                },               
             }
         }
 
@@ -104,8 +102,7 @@ impl State {
         //println!("Turn {}: {}, ({})", self.game.turn, direction, h_idx + 1);
 
         match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
-            Tile::Wall => (),
-            Tile::Hero(_) => (),
+            Tile::Wall | Tile::Hero(_) => (),         
             Tile::Tavern => if self.game.heroes[h_idx].gold >= 2 {
                 self.game.heroes[h_idx].gold -= 2;
                 self.game.heroes[h_idx].life += 50;
@@ -139,7 +136,7 @@ impl State {
                     continue;
                 }
 
-                if self.game.heroes[i].pos.manhattan_distance(&self.game.heroes[h_idx].pos.clone()) == 1 {
+                if self.game.heroes[i].pos.manhattan_distance(&self.game.heroes[h_idx].pos) == 1 {
                     if self.game.heroes[i].life <= 20 {
                         self.kill(i + 1, h_idx  + 1);
                     } else {

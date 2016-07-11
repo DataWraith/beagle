@@ -1,4 +1,3 @@
-use direction::Direction;
 use mv::Move;
  
 #[derive(Default, Clone)]
@@ -44,7 +43,7 @@ impl Table {
 		}
 		
 		
-		return None
+		None
 	}
 	
 	pub fn store(&mut self, e : Entry) {

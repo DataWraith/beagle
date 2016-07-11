@@ -1,7 +1,6 @@
 use std::hash;
 
 use position::Position;
-use direction::Direction;
 
 #[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
 pub struct Hero {

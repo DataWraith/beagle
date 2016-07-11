@@ -3,8 +3,6 @@ use std::hash::{Hash, Hasher};
 use fnv::FnvHasher;
 
 use time;
-use rand;
-use rand::Rng;
 
 use state::State;
 use direction::Direction;
@@ -12,7 +10,6 @@ use mv::Move;
 use position::Position;
 use tile::Tile;
 use transposition_table::{Table, Entry};
-use zobrist::ZobristTable;
 
 pub struct Bot {
     initialized: bool,
@@ -39,7 +36,7 @@ impl Bot {
         let mut min_dist = 255u8;
         let mut min_dir = Direction::Stay;
 
-        for mv in [Direction::North, Direction::East, Direction::South, Direction::West].iter() {
+        for mv in &[Direction::North, Direction::East, Direction::South, Direction::West] {
             let t = pos.neighbor(*mv);
             if self.tavern_dist.contains_key(&t) {
                 let dist = self.tavern_dist[&t];
@@ -73,7 +70,7 @@ impl Bot {
                         result.push((cur, dist, dir));
                     }
                     Tile::Air | Tile::Hero(_) => {
-                        for n in cur.neighbors().iter() {
+                        for n in &cur.neighbors() {
                             if !seen.contains(n) {
                                 queue.push_back((*n, dist + 1, dir));
                                 seen.insert(cur);
@@ -87,7 +84,7 @@ impl Bot {
             self.mine_dist.insert(*pos, result);
         }
 
-        for &(mpos, mdist, mdir) in self.mine_dist[pos].iter() {
+        for &(mpos, mdist, mdir) in &self.mine_dist[pos] {
             match s.game.board.tile_at(&mpos) {
                 Tile::Mine(x) if x != player_id => return (mdist, mdir),
                 _ => (),
@@ -102,20 +99,17 @@ impl Bot {
 
         for x in 0..s.game.board.size {
             for y in 0..s.game.board.size {
-                match s.game.board.tile_at(&Position{x: x, y: y}) {
-                    Tile::Tavern => {
-                        queue.push_back(Position{x: x, y: y});
-                        self.tavern_dist.insert(Position{x: x, y: y}, 0u8);
-                    },
-                    _ => (),
-                }
+				if let Tile::Tavern = s.game.board.tile_at(&Position{x: x, y: y}) {
+					queue.push_back(Position{x: x, y: y});
+					self.tavern_dist.insert(Position{x: x, y: y}, 0u8);
+				}               
             }
         }
 
         while !queue.is_empty() {
             let cur = queue.pop_front().unwrap();
 
-            for n in cur.neighbors().iter() {
+            for n in &cur.neighbors() {
                 if !self.tavern_dist.contains_key(n) {
                     match s.game.board.tile_at(n) {
                         Tile::Air | Tile::Hero(_) => {
@@ -137,7 +131,7 @@ impl Bot {
         let mut pred_gold = (s.hero.gold as usize + s.hero.mine_count as usize * turns_left as usize) + s.hero.life as usize / 10;
 		let mut neg_gold = 0 as usize;
 		
-		for h in s.game.heroes.iter() {
+		for h in &s.game.heroes {
 			if h.name == s.hero.name {
 				continue;
 			}
@@ -147,7 +141,7 @@ impl Bot {
 			neg_gold += hero_gold;			
 		}
 		
-		for h in s.game.heroes.iter() {
+		for h in &s.game.heroes {
 			if h.name == s.hero.name {
 				continue;
 			}
@@ -159,7 +153,7 @@ impl Bot {
 		
 		
 		
-		let (mdist, mdir) = self.get_closest_mine(&s.hero.pos, s.hero.id, s);
+		let (mdist, _) = self.get_closest_mine(&s.hero.pos, s.hero.id, s);
         let mut delay = 0 as usize;
         if mdist > 0 {
             if s.hero.life < mdist || s.hero.life - mdist <= 20 {
@@ -173,7 +167,7 @@ impl Bot {
         }
 
         if delay < turns_left {
-           pred_gold += 1 * (turns_left - delay);
+           pred_gold += turns_left - delay;
         }
 		
 		
@@ -185,7 +179,7 @@ impl Bot {
 		
 		// MAX node
 		if s.game.heroes[s.game.turn % 4].id == s.hero.id {
-			for dir in s.get_moves().iter() {
+			for dir in &s.get_moves() {
 				result.push(Move{
 					directions: [*dir, Direction::Stay, Direction::Stay, Direction::Stay],
 				});
@@ -195,7 +189,7 @@ impl Bot {
 			
 			// First player
 			let mut state = s.clone();
-			for dir in s.get_moves().iter() {
+			for dir in &s.get_moves() {
 				if *dir != Direction::Stay {
 				result.push(Move{
 					directions: [Direction::Stay, *dir, Direction::Stay, Direction::Stay],
@@ -205,7 +199,7 @@ impl Bot {
 			
 			// Second player
 			state.make_move(Direction::Stay);
-			for dir in s.get_moves().iter() {
+			for dir in &s.get_moves() {
 			if *dir != Direction::Stay {
 				result.push(Move{
 					directions: [Direction::Stay, Direction::Stay, *dir, Direction::Stay],
@@ -216,7 +210,7 @@ impl Bot {
 			state = s.clone();
 			state.make_move(Direction::Stay);
 			state.make_move(Direction::Stay);
-			for dir in s.get_moves().iter() {
+			for dir in &s.get_moves() {
 			if *dir != Direction::Stay {
 				result.push(Move{
 					directions: [Direction::Stay, Direction::Stay, Direction::Stay, *dir],
@@ -234,14 +228,12 @@ impl Bot {
 		
 		let mut best_score = 0;
 		let mut best_idx = 0;
-		for i in 0..moves.len() {
+		for (i, mv) in moves.iter().enumerate() {
 			let mut score = 1;
 			
-			if moves[i] == *hm && *hm != Move::default() {
+			if mv == hm && *hm != Move::default() {
 				score = 1000;
-			} else if moves[i] == self.killer1[depth as usize] {
-				score = 100;
-			} else if moves[i] == self.killer2[depth as usize] {
+			} else if *mv == self.killer1[depth as usize] || *mv == self.killer2[depth as usize] {
 				score = 100;
 			}
 			
@@ -254,14 +246,13 @@ impl Bot {
 			}
 		}
 		
-		return moves.swap_remove(best_idx)
+		moves.swap_remove(best_idx)
 	}
 
     fn brs(&mut self, s : &Box<State>, alphao : i32, betao : i32, depth : u8, end_time : time::Timespec, nodes : &mut u64) -> Option<i32> {
 		let mut alpha = alphao;
 		let mut beta = betao;
 		let mut bmove = Move::default();
-		let mut have_hash_move = false;
 		let mut g : i32;
 		let mut a : i32;
 		let mut b : i32;
@@ -275,7 +266,6 @@ impl Bot {
 			let e = entry.unwrap();
 			if e.turn >= depth as u16 {
 			
-			have_hash_move = true;
 			bmove = e.mv;
 			//bscore = e.lower;
 			
@@ -302,7 +292,7 @@ impl Bot {
 		*nodes += 1;
 		
         if depth == 0 || s.game.turn == s.game.max_turns {
-            g = self.eval(&s);
+            g = self.eval(s);
         } else if s.game.turn % 4 == s.hero.id - 1 {		
 			let mut bscore = i32::min_value();
 			g = i32::min_value();
@@ -398,7 +388,7 @@ impl Bot {
 		
 		self.tt.store(e);
 		
-		return Some(g);		
+		Some(g)		
     }
 	
 	pub fn mtdf(&mut self, s : &Box<State>, firstguess : i32, depth : u8, mut num_nodes : &mut u64, end_time : time::Timespec) -> Option<i32> {
@@ -476,8 +466,6 @@ impl Bot {
 		let mut num_nodes = 0u64;
         let mut firstguess = self.eval(s);
 		
-		let mut best_v = i32::min_value();
-		let mut best_u = i32::min_value();
 		let mut best_d = Direction::Stay;
 		let mut prev_b = Direction::Stay;
 
@@ -507,9 +495,8 @@ impl Bot {
 
 
       
-        println!("{}, {} - {} - {} - {}, nodes: {}", depth, best_d, firstguess, end_time - time::get_time(), s.hero.life, num_nodes);
+        println!("{}, {} - {} - {} - {}, nodes: {}", depth, prev_b, firstguess, end_time - time::get_time(), s.hero.life, num_nodes);
 
-        return best_d;
-
+        prev_b
     }
 }

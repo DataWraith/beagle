@@ -47,9 +47,15 @@ impl fmt::Display for Board {
 		if self.initialized {
         for x in 0..self.size {
             for y in 0..self.size {
-                write!(f, "{}", self.tile_at(&Position{x: x, y: y}));
+                let res = write!(f, "{}", self.tile_at(&Position{x: x, y: y}));
+				if !res.is_ok() {
+					return res
+				}
             }
-            write!(f, "\n");
+            let res = write!(f, "\n");
+			if !res.is_ok() {
+				return res
+			}
         }}	
         Ok(())
     }
@@ -92,12 +98,11 @@ impl Board {
 
       for x in 0..(self.size) {
           for y in 0..(self.size) {
-              let idx = (self.size as usize) * (x as usize) + (y as usize);
-
-             match  self.board[idx] {
-                 Tile::Mine(_) => self.mine_pos.push(Position{x: x, y: y}),
-                 _ => (),
-             }
+				let idx = (self.size as usize) * (x as usize) + (y as usize);
+				
+				if let Tile::Mine(_) = self.board[idx] {
+					self.mine_pos.push(Position{x: x, y: y});
+				}
           }
       }
 
@@ -114,7 +119,7 @@ impl Board {
       }
 
       let idx = (pos.x as usize) * (self.size as usize) + (pos.y as usize);
-      self.board[idx].clone()
+      self.board[idx]
     }
 
     pub fn put_tile(&mut self, pos : &Position, t : Tile) {

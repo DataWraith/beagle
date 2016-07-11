@@ -49,9 +49,9 @@ fn main() {
     let mut state : Box<state::State> = serde_json::from_str(&body).unwrap();
     state.game.board.initialize();
 
-    let mut new_state = state.clone();
+    let mut new_state : Box<state::State>;
 	
-	while true {
+	loop {
         let mv = bot.choose_move(&state);
 		println!("{}: {}", state.game.turn, mv);
 		
@@ -85,7 +85,7 @@ fn main() {
         state.make_move(mv);
         let h_idx = new_state.game.turn % 4;
         for i in 1..4 {
-            let ref mv = new_state.game.heroes[(h_idx + i) % 4].last_dir;
+            let mv = &new_state.game.heroes[(h_idx + i) % 4].last_dir;
             match mv.as_ref() {
 				"North" => state.make_move(Direction::North),
 				"East" => state.make_move(Direction::East),
