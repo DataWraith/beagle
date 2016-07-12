@@ -135,7 +135,8 @@ impl Bot {
         let mut pred_gold = (s.hero.gold as usize +
                              s.hero.mine_count as usize * turns_left as usize) +
                             s.hero.life as usize / 10;
-        let mut neg_gold = 0 as usize;
+        let mut neg_gold = 0;
+        let mut max_enemy_gold = 0;
 
         for h in &s.game.heroes {
             if h.name == s.hero.name {
@@ -143,6 +144,10 @@ impl Bot {
             }
 
             let hero_gold = h.gold as usize + (1 + h.mine_count as usize) * turns_left;
+
+            if max_enemy_gold < hero_gold {
+                max_enemy_gold = hero_gold;
+            }
 
             neg_gold += hero_gold;
         }
@@ -161,7 +166,7 @@ impl Bot {
 
         let (mdist, _) = self.get_closest_mine(&s.hero.pos, s.hero.id, s);
         let mut delay = 0 as usize;
-        if mdist > 0 {
+        if mdist > 0 && pred_gold < max_enemy_gold + 100 {
             if s.hero.life < mdist || s.hero.life - mdist <= 20 {
                 let (tdist, _) = self.get_closest_tavern(&s.hero.pos);
                 delay += 2 * tdist as usize;
