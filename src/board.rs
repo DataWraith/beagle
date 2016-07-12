@@ -1,5 +1,8 @@
 use std::fmt;
 use std::hash;
+use std::hash::{Hash, Hasher};
+
+use fnv::FnvHasher;
 
 use tile::Tile;
 use position::Position;
@@ -20,25 +23,22 @@ pub struct Board {
 }
 
 impl hash::Hash for Board {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    fn hash<H: Hasher>(&self, state: &mut H) {
 		self.hash.hash(state);
     }
 }
 
 impl PartialEq for Board {
     fn eq(&self, other: &Board) -> bool {
-        if self.size != other.size {
-            return false;
-        }
+		let mut sh = FnvHasher::default();
+		self.hash(&mut sh);
+		let shash = sh.finish();
 		
-		if self.initialized && other.initialized {
-        for i in 0..((self.size as usize) * (self.size as usize)) {
-            if self.board[i] != other.board[i] {
-                return false;
-            }
-        }}
-
-        true
+		let mut oh = FnvHasher::default();
+		other.hash(&mut oh);
+		let ohash = oh.finish();
+		
+		shash == ohash
     }
 }
 

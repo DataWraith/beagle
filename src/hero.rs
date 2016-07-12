@@ -2,7 +2,7 @@ use std::hash;
 
 use position::Position;
 
-#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq)]
 pub struct Hero {
     pub id: usize,
     pub name: String,
@@ -22,12 +22,23 @@ pub struct Hero {
     pub crashed: bool,
 }
 
+impl PartialEq for Hero {
+	fn eq(&self, other: &Hero) -> bool {
+		self.pos == other.pos &&
+		self.life == other.life &&
+		self.gold == other.gold &&
+		self.mine_count == other.mine_count &&
+		self.id == other.id &&
+		self.user_id == other.user_id &&
+		self.crashed == other.crashed
+	}
+}
+
 impl hash::Hash for Hero {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
 		self.id.hash(state);
 		self.user_id.hash(state);
 		self.pos.hash(state);
-		
 		self.life.hash(state);
 		self.gold.hash(state);
 		self.mine_count.hash(state);

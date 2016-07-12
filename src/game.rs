@@ -1,9 +1,12 @@
 use std::hash;
+use std::hash::{Hash, Hasher};
+
+use fnv::FnvHasher;
 
 use board::Board;
 use hero::Hero;
 
-#[derive(Deserialize, Debug, Eq, PartialEq)]
+#[derive(Deserialize, Debug, Eq)]
 pub struct Game {
     pub id: String,
     pub turn: usize,
@@ -26,6 +29,20 @@ impl Clone for Game {
             board: self.board.clone(),
             finished: self.finished,
         }
+    }
+}
+
+impl PartialEq for Game {
+    fn eq(&self, other: &Game) -> bool {
+		let mut sh = FnvHasher::default();
+		self.hash(&mut sh);
+		let shash = sh.finish();
+		
+		let mut oh = FnvHasher::default();
+		other.hash(&mut oh);
+		let ohash = oh.finish();
+		
+		shash == ohash
     }
 }
 

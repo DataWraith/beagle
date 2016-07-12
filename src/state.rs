@@ -1,11 +1,14 @@
 use std::hash;
+use std::hash::{Hash,Hasher};
+
+use fnv::FnvHasher;
 
 use game::Game;
 use hero::Hero;
 use tile::Tile;
 use direction::Direction;
 
-#[derive(Clone, Deserialize, Debug, Eq, PartialEq)]
+#[derive(Clone, Deserialize, Debug, Eq)]
 pub struct State {
     pub game: Game,
     pub hero: Hero,
@@ -22,6 +25,20 @@ impl hash::Hash for State {
         self.token.hash(state);
         self.view_url.hash(state);
         self.play_url.hash(state);
+    }
+}
+
+impl PartialEq for State {
+    fn eq(&self, other: &State) -> bool {
+		let mut sh = FnvHasher::default();
+		self.game.hash(&mut sh);
+		let shash = sh.finish();
+		
+		let mut oh = FnvHasher::default();
+		other.game.hash(&mut oh);
+		let ohash = oh.finish();
+		
+		shash == ohash
     }
 }
 
