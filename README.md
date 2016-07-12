@@ -42,6 +42,8 @@ first search and then cached.
 * [ ] Experiment with Quiescence Search
 * [ ] Team play
 * [ ] Unmake moves instead of copying state around
+* [ ] Better Move Ordering
+* [ ] Ignore opponent moves if the opponent is on the other side of the map
 
 [Vindinium]: http://vindinium.org
 [MTD(f)]: https://people.csail.mit.edu/plaat/mtdf.html
