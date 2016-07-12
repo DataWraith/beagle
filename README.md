@@ -40,6 +40,7 @@ first search and then cached.
 * [ ] Experiment with Paranoid instead of Best Reply Search
 * [ ] Experiment with Quiescence Search
 * [ ] Team play
+* [ ] Unmake moves instead of copying state around
 
 [Vindinium]: http://vindinium.org
 [Best Reply Search]: https://project.dke.maastrichtuniversity.nl/games/files/articles/BestReplySearch.pdf
