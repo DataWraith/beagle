@@ -1,7 +1,7 @@
 [package]
 name = "brs"
 version = "0.1.0"
-authors = ["Johannes Holzfuß <DataWraith@web.de>"]
+authors = ["Johannes Holzfuß <johannes@holzfuss.name>"]
 
 [dependencies]
 serde = "*"
