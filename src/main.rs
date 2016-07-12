@@ -85,15 +85,15 @@ fn main() {
             state.make_move(mv);
             let h_idx = new_state.game.turn % 4;
             for i in 1..4 {
-                let mv = &new_state.game.heroes[(h_idx + i) % 4].last_dir;
-                match mv.as_ref() {
+                let nextmv = &new_state.game.heroes[(h_idx + i) % 4].last_dir;
+                match nextmv.as_ref() {
                     "North" => state.make_move(Direction::North),
                     "East" => state.make_move(Direction::East),
                     "South" => state.make_move(Direction::South),
                     "West" => state.make_move(Direction::West),
                     "Stay" => state.make_move(Direction::Stay),
                     _ => unreachable!(),
-                }
+                };
             }
         }
     }

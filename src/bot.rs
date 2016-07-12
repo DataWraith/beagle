@@ -209,7 +209,7 @@ impl Bot {
             }
 
             // Second player
-            state.make_move(Direction::Stay);
+            let mut umi = state.make_move(Direction::Stay);
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
@@ -217,11 +217,12 @@ impl Bot {
                     });
                 }
             }
-
-            // Third player
-            state = s.clone();
-            state.make_move(Direction::Stay);
-            state.make_move(Direction::Stay);
+			state.unmake_move(umi);
+			assert_eq!(*s, state);
+			
+            // Third player           
+            umi = state.make_move(Direction::Stay);
+            let umi2 = state.make_move(Direction::Stay);
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
@@ -229,6 +230,9 @@ impl Bot {
                     });
                 }
             }
+			state.unmake_move(umi2);
+			state.unmake_move(umi);
+			assert_eq!(state, *s)
         }
 
         result
@@ -321,18 +325,23 @@ impl Bot {
 
             let mut moves = self.generate_moves(s);
 
+			let mut state = s.clone();
+			
             while !moves.is_empty() {
                 if g >= beta {
                     break;
                 }
-
-                let mut state = s.clone();
+               
                 let curmove = self.pick_next_move(depth, &bmove, &mut moves);
-                state.make_move(curmove.directions[0]);
+                let umi = state.make_move(curmove.directions[0]);
                 let v = self.brs(&state, a, beta, depth - 1, end_time, nodes);
-                if v.is_none() {
+				state.unmake_move(umi);
+				assert_eq!(state, *s);
+				
+				if v.is_none() {
                     return None;
                 }
+				                
                 let score = v.unwrap();
                 if score > bscore {
                     bmove = curmove;
@@ -359,12 +368,19 @@ impl Bot {
 
                 let mut state = s.clone();
                 let curmove = self.pick_next_move(depth, &bmove, &mut moves);
-                for i in 1..4 {
-                    state.make_move(curmove.directions[i]);
-                }
-
+				let umi1 = state.make_move(curmove.directions[1]);
+				let umi2 = state.make_move(curmove.directions[2]);
+				let umi3 = state.make_move(curmove.directions[3]);
+                
                 let v = self.brs(&state, alpha, b, depth - 1, end_time, nodes);
-                if v.is_none() {
+				
+				state.unmake_move(umi3);
+				state.unmake_move(umi2);
+				state.unmake_move(umi1);
+				
+				assert_eq!(state, *s);
+				
+				if v.is_none() {
                     return None;
                 }
                 let score = v.unwrap();
