@@ -55,7 +55,7 @@ impl Table {
             self.depthpref[idx].hash = e.hash;
             self.depthpref[idx].lower = e.lower;
             self.depthpref[idx].upper = e.upper;
-            self.depthpref[idx].turn = e.turn;
+            self.depthpref[idx].depth = e.depth;
             self.depthpref[idx].age = e.age;
 
             return;
