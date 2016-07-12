@@ -264,7 +264,7 @@ impl Bot {
 		
 		if entry.is_some() {
 			let e = entry.unwrap();
-			if e.turn >= depth as u16 {
+			if e.depth >= depth as u16 {
 			
 			bmove = e.mv;
 			//bscore = e.lower;
@@ -382,7 +382,7 @@ impl Bot {
 			}
 		}
 		
-		e.turn = depth as u16;
+		e.depth = depth as u16;
 		e.hash = hash;
 		e.age = s.game.turn as u16;
 		
@@ -482,7 +482,7 @@ impl Bot {
 			let entry = self.tt.probe(hash);
 			if entry.is_some() {
 				let e = entry.unwrap();
-				println!("{}: [{}, {}], {}", e.mv.directions[0], e.lower, e.upper, e.turn);
+				println!("{}: [{}, {}], {}", e.mv.directions[0], e.lower, e.upper, e.depth);
 				prev_b = best_d;
 				best_d = e.mv.directions[0];
 			}

@@ -95,17 +95,6 @@ fn main() {
 				_ => unreachable!(),
 			}
         }}
-		
-		//println!("{}", state.game.board);
-		
-		
-
-        if state != new_state {
-            println!("{}", state.game.board);
-			new_state.game.board.initialize();
-			println!("{}", new_state.game.board);
-            assert_eq!(state, new_state);
-        }
 	}
 
 	println!("{}", state.view_url);

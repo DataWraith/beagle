@@ -22,20 +22,18 @@ pub struct State {
 impl hash::Hash for State {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         self.game.hash(state);
-        self.token.hash(state);
-        self.view_url.hash(state);
-        self.play_url.hash(state);
+        self.token.hash(state);        
     }
 }
 
 impl PartialEq for State {
     fn eq(&self, other: &State) -> bool {
 		let mut sh = FnvHasher::default();
-		self.game.hash(&mut sh);
+		self.hash(&mut sh);
 		let shash = sh.finish();
 		
 		let mut oh = FnvHasher::default();
-		other.game.hash(&mut oh);
+		other.hash(&mut oh);
 		let ohash = oh.finish();
 		
 		shash == ohash

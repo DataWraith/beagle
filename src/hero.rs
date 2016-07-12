@@ -1,4 +1,7 @@
 use std::hash;
+use std::hash::{Hash, Hasher};
+
+use fnv::FnvHasher;
 
 use position::Position;
 
@@ -24,13 +27,15 @@ pub struct Hero {
 
 impl PartialEq for Hero {
 	fn eq(&self, other: &Hero) -> bool {
-		self.pos == other.pos &&
-		self.life == other.life &&
-		self.gold == other.gold &&
-		self.mine_count == other.mine_count &&
-		self.id == other.id &&
-		self.user_id == other.user_id &&
-		self.crashed == other.crashed
+		let mut sh = FnvHasher::default();
+		self.hash(&mut sh);
+		let shash = sh.finish();
+		
+		let mut oh = FnvHasher::default();
+		other.hash(&mut oh);
+		let ohash = oh.finish();
+		
+		shash == ohash
 	}
 }
 

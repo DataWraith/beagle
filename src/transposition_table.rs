@@ -1,12 +1,13 @@
 use mv::Move;
  
+#[repr(packed)]
 #[derive(Default, Clone)]
 pub struct Entry {
 	pub mv: Move,
 	pub hash: u64,
 	pub lower: i32,
 	pub upper: i32,
-	pub turn: u16,
+	pub depth: u16,
 	pub age: u16,
 }
 
@@ -49,7 +50,7 @@ impl Table {
 	pub fn store(&mut self, e : Entry) {
 		let idx = (e.hash % self.num_entries) as usize;
 		
-		if self.depthpref[idx].turn <= e.turn || self.depthpref[idx].age + 15 < e.age {
+		if self.depthpref[idx].depth <= e.depth || self.depthpref[idx].age + 15 < e.age {
 			self.depthpref[idx].mv = e.mv;
 			self.depthpref[idx].hash = e.hash;
 			self.depthpref[idx].lower = e.lower;
@@ -64,7 +65,7 @@ impl Table {
 		self.always[idx].hash = e.hash;
 		self.always[idx].lower = e.lower;
 		self.always[idx].upper = e.upper;
-		self.always[idx].turn = e.turn;
+		self.always[idx].depth = e.depth;
 		self.always[idx].age = e.age;
 	}
 }
