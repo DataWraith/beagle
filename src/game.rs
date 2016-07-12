@@ -10,7 +10,7 @@ use hero::Hero;
 pub struct Game {
     pub id: String,
     pub turn: usize,
-	#[serde(rename="maxTurns")]
+    #[serde(rename="maxTurns")]
     pub max_turns: usize,
     pub heroes: [Hero; 4],
     pub board: Board,
@@ -19,13 +19,14 @@ pub struct Game {
 
 impl Clone for Game {
     fn clone(&self) -> Game {
-        Game{
+        Game {
             id: self.id.clone(),
             turn: self.turn,
             max_turns: self.max_turns,
-            heroes: [
-              self.heroes[0].clone(), self.heroes[1].clone(), self.heroes[2].clone(), self.heroes[3].clone()
-            ],
+            heroes: [self.heroes[0].clone(),
+                     self.heroes[1].clone(),
+                     self.heroes[2].clone(),
+                     self.heroes[3].clone()],
             board: self.board.clone(),
             finished: self.finished,
         }
@@ -34,15 +35,15 @@ impl Clone for Game {
 
 impl PartialEq for Game {
     fn eq(&self, other: &Game) -> bool {
-		let mut sh = FnvHasher::default();
-		self.hash(&mut sh);
-		let shash = sh.finish();
-		
-		let mut oh = FnvHasher::default();
-		other.hash(&mut oh);
-		let ohash = oh.finish();
-		
-		shash == ohash
+        let mut sh = FnvHasher::default();
+        self.hash(&mut sh);
+        let shash = sh.finish();
+
+        let mut oh = FnvHasher::default();
+        other.hash(&mut oh);
+        let ohash = oh.finish();
+
+        shash == ohash
     }
 }
 

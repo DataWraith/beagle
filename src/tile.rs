@@ -18,8 +18,8 @@ impl Default for Tile {
 impl fmt::Display for Tile {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Tile::Wall   => write!(f, "##"),
-            Tile::Air    => write!(f, "  "),
+            Tile::Wall => write!(f, "##"),
+            Tile::Air => write!(f, "  "),
             Tile::Tavern => write!(f, "[]"),
             Tile::Mine(0) => write!(f, "$-"),
             Tile::Mine(x) => write!(f, "${}", x),
@@ -29,13 +29,13 @@ impl fmt::Display for Tile {
 }
 
 impl Tile {
-	pub fn to_usize(&self) -> usize {
-		match *self {
-			Tile::Wall => 0,
-			Tile::Air  => 1,
-			Tile::Tavern => 2,
-			Tile::Mine(x) => 3 + x as usize,
-			Tile::Hero(x) => 7 + x as usize,
-		}
-	}
+    pub fn to_usize(&self) -> usize {
+        match *self {
+            Tile::Wall => 0,
+            Tile::Air => 1,
+            Tile::Tavern => 2,
+            Tile::Mine(x) => 3 + x as usize,
+            Tile::Hero(x) => 7 + x as usize,
+        }
+    }
 }
