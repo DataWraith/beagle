@@ -17,8 +17,9 @@ yet.
 
 ## Inner workings
 
-The bot is based on [Iterative Deepening] [Best Reply Search] (PDF) with the [MTD(f)] driver
-and uses [Zobrist Hashing].
+The bot is based on [Iterative Deepening](https://chessprogramming.wikispaces.com/Iterative+Deepening) 
+[Best Reply Search](https://project.dke.maastrichtuniversity.nl/games/files/articles/BestReplySearch.pdf) 
+(PDF) with the [MTD(f)] driver and uses [Zobrist Hashing].
 
 The search trawls through between 20k and 100k nodes per turn, reaching a depth of about 10
 moves (depending on map size and complexity), but still does stupid things occasionally;
@@ -43,7 +44,5 @@ first search and then cached.
 * [ ] Unmake moves instead of copying state around
 
 [Vindinium]: http://vindinium.org
-[Best Reply Search]: https://project.dke.maastrichtuniversity.nl/games/files/articles/BestReplySearch.pdf
-[Iterative Deepening]: https://chessprogramming.wikispaces.com/Iterative+Deepening
 [MTD(f)]: https://people.csail.mit.edu/plaat/mtdf.html
 [Zobrist Hashing]: https://en.wikipedia.org/wiki/Zobrist_hashing
