@@ -8,13 +8,6 @@ It is my first Rust project, and the code was written in a trial-and-error fashi
 up-front design, so it's definitively not a very clean code base. I'd go so far as to call
 it sloppy. In order to run it, you currently need the nightly Rust compiler (v. 1.12).
 
-I have embedded the bot's key out of sheer laziness, so feel free to
-ruin the (not exactly great) rank it has on the server by running it yourself.
-
-The bot currently can't cope with the larger maps due to the way pathfinding works and simply
-crashes. Apropos crashing, it does that a lot, usually with a stack overflow I couldn't pin down
-yet.
-
 ## Inner workings
 
 The bot is based on [Iterative Deepening](https://chessprogramming.wikispaces.com/Iterative+Deepening)
@@ -42,7 +35,7 @@ tavern that is not the nearest one.
 * [X] Unmake moves instead of copying state around
 * [ ] Better Move Ordering
 * [ ] Ignore opponent moves if the opponent is on the other side of the map
-* [ ] Try a simple BFS instead for finding mines (might be faster)
+* [ ] Try a simple BFS for finding mines (might be faster)
 
 [Vindinium]: http://vindinium.org
 [MTD(f)]: https://people.csail.mit.edu/plaat/mtdf.html
