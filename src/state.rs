@@ -21,8 +21,8 @@ pub struct State {
 }
 
 pub struct UnmakeInfo {
-	heroes: [Hero; 4],
-	tiles: Vec<(Position, Tile)>,
+    heroes: [Hero; 4],
+    tiles: Vec<(Position, Tile)>,
 }
 
 impl hash::Hash for State {
@@ -47,7 +47,7 @@ impl PartialEq for State {
 }
 
 impl State {
-    fn kill(&mut self, hero_id: usize, killer_id: usize, umi : &mut UnmakeInfo) {
+    fn kill(&mut self, hero_id: usize, killer_id: usize, umi: &mut UnmakeInfo) {
         // println!("{} killed by {}", hero_id, killer_id);
 
         if killer_id > 0 {
@@ -66,7 +66,7 @@ impl State {
         // println!("{:?}", mpos);
 
         for ref pos in mpos {
-			umi.tiles.push((*pos, self.game.board.tile_at(pos)));
+            umi.tiles.push((*pos, self.game.board.tile_at(pos)));
             self.game.board.put_tile(pos, Tile::Mine(killer_id));
         }
 
@@ -83,9 +83,9 @@ impl State {
         let old_pos = &self.game.heroes[hero_id - 1].pos.clone();
         let new_pos = &self.game.heroes[hero_id - 1].spawn_pos.clone();
 
-		umi.tiles.push((*old_pos, Tile::Hero(hero_id)));
+        umi.tiles.push((*old_pos, Tile::Hero(hero_id)));
         self.game.board.put_tile(old_pos, Tile::Air);
-		umi.tiles.push((*new_pos, Tile::Air));
+        umi.tiles.push((*new_pos, Tile::Air));
         self.game.board.put_tile(new_pos, Tile::Hero(hero_id));
         self.game.heroes[hero_id - 1].pos = *new_pos;
         self.game.heroes[hero_id - 1].life = 100;
@@ -125,14 +125,17 @@ impl State {
     }
 
     pub fn make_move(&mut self, direction: Direction) -> UnmakeInfo {
-		let mut result = UnmakeInfo {
-			heroes: [self.game.heroes[0].clone(), self.game.heroes[1].clone(), self.game.heroes[2].clone(), self.game.heroes[3].clone()],
-			tiles: Vec::with_capacity(32),
-		};
-		
+        let mut result = UnmakeInfo {
+            heroes: [self.game.heroes[0].clone(),
+                     self.game.heroes[1].clone(),
+                     self.game.heroes[2].clone(),
+                     self.game.heroes[3].clone()],
+            tiles: Vec::with_capacity(32),
+        };
+
         let h_idx = (self.game.turn % 4) as usize;
         let mut hero_died = false;
-       
+
         match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
             Tile::Wall | Tile::Hero(_) => (),         
             Tile::Tavern => {
@@ -145,9 +148,9 @@ impl State {
                 }
             }
             Tile::Air => {
-				result.tiles.push((self.game.heroes[h_idx].pos, Tile::Hero(h_idx + 1)));
+                result.tiles.push((self.game.heroes[h_idx].pos, Tile::Hero(h_idx + 1)));
                 self.game.board.put_tile(&self.game.heroes[h_idx].pos, Tile::Air);
-				result.tiles.push((self.game.heroes[h_idx].pos.neighbor(direction), Tile::Air));
+                result.tiles.push((self.game.heroes[h_idx].pos.neighbor(direction), Tile::Air));
                 self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction),
                                          Tile::Hero(h_idx + 1));
                 self.game.heroes[h_idx].pos = self.game.heroes[h_idx].pos.neighbor(direction);
@@ -163,8 +166,10 @@ impl State {
                         }
                         self.game.heroes[h_idx].mine_count += 1;
                         self.game.heroes[h_idx].life -= 20;
-						result.tiles.push((self.game.heroes[h_idx].pos.neighbor(direction), 
-										  self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction))));
+                        result.tiles.push((self.game.heroes[h_idx].pos.neighbor(direction),
+                                           self.game
+                            .board
+                            .tile_at(&self.game.heroes[h_idx].pos.neighbor(direction))));
                         self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction),
                                                  Tile::Mine(h_idx + 1));
                     }
@@ -203,17 +208,17 @@ impl State {
         if self.game.turn == self.game.max_turns {
             self.game.finished = true;
         }
-		
-		result
+
+        result
     }
-	
-	pub fn unmake_move(&mut self, umi : UnmakeInfo) {
-		self.game.finished = false;
-		self.game.turn -= 1;
-		self.game.heroes = umi.heroes;
-		self.hero = self.game.heroes[self.hero.id - 1].clone();
-		for &(pos, t) in umi.tiles.iter().rev() {
-			self.game.board.put_tile(&pos, t)
-		}
-	}
+
+    pub fn unmake_move(&mut self, umi: UnmakeInfo) {
+        self.game.finished = false;
+        self.game.turn -= 1;
+        self.game.heroes = umi.heroes;
+        self.hero = self.game.heroes[self.hero.id - 1].clone();
+        for &(pos, t) in umi.tiles.iter().rev() {
+            self.game.board.put_tile(&pos, t)
+        }
+    }
 }

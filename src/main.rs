@@ -52,7 +52,7 @@ fn main() {
     let mut new_state: Box<state::State>;
 
     loop {
-        let mv = bot.choose_move(&state);
+        let mv = bot.choose_move(&mut state);
         println!("{}: {}", state.game.turn, mv);
 
         res = client.post(Url::parse(&state.play_url).unwrap())

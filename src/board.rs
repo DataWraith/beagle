@@ -4,6 +4,8 @@ use std::hash::{Hash, Hasher};
 
 use fnv::FnvHasher;
 
+use std::collections::HashSet;
+
 use tile::Tile;
 use position::Position;
 use zobrist::ZOBRIST;
@@ -18,6 +20,8 @@ pub struct Board {
     tiles: String,
     #[serde(default)]
     pub mine_pos: Vec<Position>,
+    #[serde(default)]
+    pub tavern_pos: Vec<Position>,
     #[serde(default)]
     pub hash: u64,
 }
@@ -66,6 +70,7 @@ impl Board {
     pub fn initialize(&mut self) {
         self.board = vec![Tile::Wall; (self.size as usize * self.size as usize)];
         self.mine_pos = vec![];
+        self.tavern_pos = Vec::with_capacity(4);
         self.hash = 0;
 
         {
@@ -103,6 +108,8 @@ impl Board {
 
                 if let Tile::Mine(_) = self.board[idx] {
                     self.mine_pos.push(Position { x: x, y: y });
+                } else if let Tile::Tavern = self.board[idx] {
+                    self.tavern_pos.push(Position { x: x, y: y });
                 }
             }
         }
@@ -130,6 +137,94 @@ impl Board {
             self.hash ^= ZOBRIST.keys[12 * idx + self.board[idx].to_usize()];
             self.board[idx] = t;
             self.hash ^= ZOBRIST.keys[12 * idx + self.board[idx].to_usize()];
+        }
+    }
+
+    // Hadlock's shortest path algorithm
+    pub fn shortest_path_length(&self,
+                                start: &Position,
+                                goal: &Position,
+                                max_dist: u8)
+                                -> Option<u8> {
+        // Step 1
+        let mut u = *start;
+        let mut d = 0u8;
+        let mut visited = HashSet::new();
+        let mut pos_stack = Vec::new();
+        let mut neg_stack = Vec::new();
+
+
+        if start.manhattan_distance(goal) as u8 >= max_dist {
+            return None;
+        }
+
+        // Step 2
+        'outer: loop {
+            if u == *goal {
+                return Some(start.manhattan_distance(goal) as u8 + 2 * d);
+            }
+
+            visited.insert(u);
+
+            let mut num_pos = 0;
+
+            for v in &u.neighbors() {
+                match self.tile_at(v) {
+                    Tile::Wall | Tile::Hero(_) => (),
+                    Tile::Tavern | Tile::Mine(_) => {
+                        if v == goal {
+                            pos_stack.push(v.clone());
+                            num_pos += 1;
+                        }
+                    }
+                    Tile::Air => {
+                        if !visited.contains(v) {
+                            let dist_diff: i8 = u.manhattan_distance(goal) as i8 -
+                                                v.manhattan_distance(goal) as i8;
+                            if dist_diff < 0 {
+                                neg_stack.push(v.clone());
+                            } else {
+                                pos_stack.push(v.clone());
+                                num_pos += 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if num_pos > 0 {
+                u = pos_stack.pop().unwrap().clone();
+                continue 'outer;
+            }
+
+            // Step 3
+            'step3: loop {
+                while !pos_stack.is_empty() {
+                    let v = pos_stack.pop().unwrap();
+                    if visited.contains(&v) {
+                        continue;
+                    } else {
+                        u = v.clone();
+                        continue 'outer;
+                    }
+                }
+
+                // Step 4
+                if !neg_stack.is_empty() {
+                    pos_stack = neg_stack.clone();
+                    neg_stack = Vec::new();
+                    d += 1;
+                    if start.manhattan_distance(goal) as u8 + 2 * d >= max_dist {
+                        return None;
+                    }
+                    continue 'step3;
+                } else {
+                    break;
+                }
+            }
+
+            // Step 5
+            return None;
         }
     }
 }

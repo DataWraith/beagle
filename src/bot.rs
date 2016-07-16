@@ -32,101 +32,49 @@ impl Bot {
         }
     }
 
-    fn get_closest_tavern(&self, pos: &Position) -> (u8, Direction) {
-        let mut min_dist = 255u8;
-        let mut min_dir = Direction::Stay;
+    fn get_closest_tavern_dist(&mut self, s: &Box<State>, pos: &Position) -> u8 {
+        if !self.tavern_dist.contains_key(pos) {
+            let mut min_dist = 255;
+            let mut min_dir = Direction::Stay;
 
-        for mv in &[Direction::North, Direction::East, Direction::South, Direction::West] {
-            let t = pos.neighbor(*mv);
-            if self.tavern_dist.contains_key(&t) {
-                let dist = self.tavern_dist[&t];
-                if dist < min_dist {
-                    min_dist = dist;
-                    min_dir = *mv;
+            for tpos in &s.game.board.tavern_pos {
+                let new_d = s.game.board.shortest_path_length(pos, tpos, min_dist);
+                if new_d.is_some() {
+                    min_dist = new_d.unwrap();
                 }
             }
+
+            self.tavern_dist.insert(*pos, min_dist as u8);
+            return min_dist as u8;
         }
 
-        (min_dist + 1, min_dir)
+        return self.tavern_dist[pos];
     }
 
-    fn get_closest_mine(&mut self,
-                        pos: &Position,
-                        player_id: usize,
-                        s: &Box<State>)
-                        -> (u8, Direction) {
-        if !self.mine_dist.contains_key(pos) {
-            let mut queue = VecDeque::new();
-            let mut seen = HashSet::new();
-            let mut result = Vec::new();
+    fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &Box<State>) -> u8 {
+        let mut min_dist = 255;
 
-            seen.insert(*pos);
-            queue.push_back((pos.neighbor(Direction::North), 1, Direction::North));
-            queue.push_back((pos.neighbor(Direction::East), 1, Direction::East));
-            queue.push_back((pos.neighbor(Direction::South), 1, Direction::South));
-            queue.push_back((pos.neighbor(Direction::West), 1, Direction::West));
-
-            while !queue.is_empty() {
-                let (cur, dist, dir) = queue.pop_front().unwrap();
-
-                match s.game.board.tile_at(&cur) {
-                    Tile::Mine(_) => {
-                        result.push((cur, dist, dir));
+        for tpos in &s.game.board.mine_pos {
+            let t = s.game.board.tile_at(&tpos);
+            match t {
+                Tile::Mine(x) if x != player_id => {
+                    let dist = s.game.board.shortest_path_length(pos, &tpos, min_dist);
+                    if dist.is_some() {
+                        min_dist = dist.unwrap();
                     }
-                    Tile::Air | Tile::Hero(_) => {
-                        for n in &cur.neighbors() {
-                            if !seen.contains(n) {
-                                queue.push_back((*n, dist + 1, dir));
-                                seen.insert(cur);
-                            }
-                        }
-                    }
-                    _ => (),
                 }
-            }
-
-            self.mine_dist.insert(*pos, result);
-        }
-
-        for &(mpos, mdist, mdir) in &self.mine_dist[pos] {
-            match s.game.board.tile_at(&mpos) {
-                Tile::Mine(x) if x != player_id => return (mdist, mdir),
                 _ => (),
             }
         }
 
-        (0, Direction::Stay)
+        if min_dist == 255 {
+            return 0;
+        }
+
+        min_dist
     }
 
     fn initialize(&mut self, s: &Box<State>) {
-        let mut queue = VecDeque::new();
-
-        for x in 0..s.game.board.size {
-            for y in 0..s.game.board.size {
-                if let Tile::Tavern = s.game.board.tile_at(&Position { x: x, y: y }) {
-                    queue.push_back(Position { x: x, y: y });
-                    self.tavern_dist.insert(Position { x: x, y: y }, 0u8);
-                }
-            }
-        }
-
-        while !queue.is_empty() {
-            let cur = queue.pop_front().unwrap();
-
-            for n in &cur.neighbors() {
-                if !self.tavern_dist.contains_key(n) {
-                    match s.game.board.tile_at(n) {
-                        Tile::Air | Tile::Hero(_) => {
-                            let dist = self.tavern_dist[&cur] + 1u8;
-                            self.tavern_dist.insert(*n, dist);
-                            queue.push_back(*n);
-                        }
-                        _ => (),
-                    }
-                }
-            }
-        }
-
         self.initialized = true;
     }
 
@@ -164,16 +112,16 @@ impl Bot {
 
 
 
-        let (mdist, _) = self.get_closest_mine(&s.hero.pos, s.hero.id, s);
+        let mdist = self.get_closest_mine_dist(&s.hero.pos, s.hero.id, s);
         let mut delay = 0 as usize;
         if mdist > 0 && pred_gold < max_enemy_gold + 100 {
             if s.hero.life < mdist || s.hero.life - mdist <= 20 {
-                let (tdist, _) = self.get_closest_tavern(&s.hero.pos);
+                let tdist = self.get_closest_tavern_dist(s, &s.hero.pos);
                 delay += 2 * tdist as usize;
             }
             delay += mdist as usize;
         } else {
-            let (tdist, _) = self.get_closest_tavern(&s.hero.pos);
+            let tdist = self.get_closest_tavern_dist(s, &s.hero.pos);
             delay += tdist as usize;
         }
 
@@ -185,7 +133,7 @@ impl Bot {
         (3i32 * pred_gold as i32 - neg_gold as i32)
     }
 
-    fn generate_moves(&mut self, s: &Box<State>) -> Vec<Move> {
+    fn generate_moves(&mut self, s: &mut Box<State>) -> Vec<Move> {
         let mut result = Vec::with_capacity(12);
 
         // MAX node
@@ -199,7 +147,6 @@ impl Bot {
             // MIN node
 
             // First player
-            let mut state = s.clone();
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
@@ -209,7 +156,7 @@ impl Bot {
             }
 
             // Second player
-            let mut umi = state.make_move(Direction::Stay);
+            let mut umi = s.make_move(Direction::Stay);
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
@@ -217,12 +164,11 @@ impl Bot {
                     });
                 }
             }
-			state.unmake_move(umi);
-			assert_eq!(*s, state);
-			
-            // Third player           
-            umi = state.make_move(Direction::Stay);
-            let umi2 = state.make_move(Direction::Stay);
+            s.unmake_move(umi);
+
+            // Third player
+            umi = s.make_move(Direction::Stay);
+            let umi2 = s.make_move(Direction::Stay);
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
@@ -230,9 +176,8 @@ impl Bot {
                     });
                 }
             }
-			state.unmake_move(umi2);
-			state.unmake_move(umi);
-			assert_eq!(state, *s)
+            s.unmake_move(umi2);
+            s.unmake_move(umi);
         }
 
         result
@@ -267,7 +212,7 @@ impl Bot {
     }
 
     fn brs(&mut self,
-           s: &Box<State>,
+           s: &mut Box<State>,
            alphao: i32,
            betao: i32,
            depth: u8,
@@ -325,23 +270,20 @@ impl Bot {
 
             let mut moves = self.generate_moves(s);
 
-			let mut state = s.clone();
-			
             while !moves.is_empty() {
                 if g >= beta {
                     break;
                 }
-               
+
                 let curmove = self.pick_next_move(depth, &bmove, &mut moves);
-                let umi = state.make_move(curmove.directions[0]);
-                let v = self.brs(&state, a, beta, depth - 1, end_time, nodes);
-				state.unmake_move(umi);
-				assert_eq!(state, *s);
-				
-				if v.is_none() {
+                let umi = s.make_move(curmove.directions[0]);
+                let v = self.brs(s, a, beta, depth - 1, end_time, nodes);
+                s.unmake_move(umi);
+
+                if v.is_none() {
                     return None;
                 }
-				                
+
                 let score = v.unwrap();
                 if score > bscore {
                     bmove = curmove;
@@ -366,21 +308,18 @@ impl Bot {
                     break;
                 }
 
-                let mut state = s.clone();
                 let curmove = self.pick_next_move(depth, &bmove, &mut moves);
-				let umi1 = state.make_move(curmove.directions[1]);
-				let umi2 = state.make_move(curmove.directions[2]);
-				let umi3 = state.make_move(curmove.directions[3]);
-                
-                let v = self.brs(&state, alpha, b, depth - 1, end_time, nodes);
-				
-				state.unmake_move(umi3);
-				state.unmake_move(umi2);
-				state.unmake_move(umi1);
-				
-				assert_eq!(state, *s);
-				
-				if v.is_none() {
+                let umi1 = s.make_move(curmove.directions[1]);
+                let umi2 = s.make_move(curmove.directions[2]);
+                let umi3 = s.make_move(curmove.directions[3]);
+
+                let v = self.brs(s, alpha, b, depth - 1, end_time, nodes);
+
+                s.unmake_move(umi3);
+                s.unmake_move(umi2);
+                s.unmake_move(umi1);
+
+                if v.is_none() {
                     return None;
                 }
                 let score = v.unwrap();
@@ -429,7 +368,7 @@ impl Bot {
     }
 
     pub fn mtdf(&mut self,
-                s: &Box<State>,
+                s: &mut Box<State>,
                 firstguess: i32,
                 depth: u8,
                 mut num_nodes: &mut u64,
@@ -489,7 +428,7 @@ impl Bot {
         Some(g)
     }
 
-    pub fn choose_move(&mut self, s: &Box<State>) -> Direction {
+    pub fn choose_move(&mut self, s: &mut Box<State>) -> Direction {
         let end_time = time::get_time() + time::Duration::milliseconds(750);
 
         if !self.initialized {
