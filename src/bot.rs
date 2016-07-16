@@ -52,7 +52,27 @@ impl Bot {
     }
 
     fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &Box<State>) -> u8 {
+        let mut best_pos = s.game.board.mine_pos[0];
+        let mut best_dist = 255;
+        for tpos in &s.game.board.mine_pos {
+            let t = s.game.board.tile_at(&tpos);
+            match t {
+                Tile::Mine(x) if x != player_id => {
+                    let dist = tpos.manhattan_distance(pos);
+                    if dist < best_dist {
+                        best_dist = dist;
+                        best_pos = *tpos;
+                    }
+                }
+                _ => (),
+            };
+        }
+
         let mut min_dist = 255;
+        let initial_dist = s.game.board.shortest_path_length(pos, &best_pos, 255);
+        if initial_dist.is_some() {
+            min_dist = initial_dist.unwrap();
+        }
 
         for tpos in &s.game.board.mine_pos {
             let t = s.game.board.tile_at(&tpos);
