@@ -361,13 +361,11 @@ impl Bot {
             e.upper = g;
             e.lower = i32::min_value();
             e.mv = bmove;
-        }
-        if g > alpha && g < beta {
+        } else if g > alpha && g < beta {
             e.upper = g;
             e.lower = g;
             e.mv = bmove;
-        }
-        if g >= beta {
+        } else if g >= beta {
             e.lower = g;
             e.upper = i32::max_value();
             e.mv = bmove;
