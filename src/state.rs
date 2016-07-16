@@ -20,7 +20,9 @@ pub struct State {
     pub play_url: String,
 }
 
+#[derive(Debug)]
 pub struct UnmakeInfo {
+    kill_depth: u8,
     heroes: [Hero; 4],
     tiles: Vec<(Position, Tile)>,
 }
@@ -49,6 +51,14 @@ impl PartialEq for State {
 impl State {
     fn kill(&mut self, hero_id: usize, killer_id: usize, umi: &mut UnmakeInfo) {
         // println!("{} killed by {}", hero_id, killer_id);
+        umi.kill_depth += 1;
+        if umi.kill_depth > 4 {
+            println!("kill_depth exceeded 4!, hero_id: {}, killer_id: {}, umi: {:?}",
+                     hero_id,
+                     killer_id,
+                     umi);
+            return;
+        }
 
         if killer_id > 0 {
             self.game.heroes[killer_id - 1].mine_count += self.game.heroes[hero_id - 1].mine_count;
@@ -126,6 +136,7 @@ impl State {
 
     pub fn make_move(&mut self, direction: Direction) -> UnmakeInfo {
         let mut result = UnmakeInfo {
+            kill_depth: 0u8,
             heroes: [self.game.heroes[0].clone(),
                      self.game.heroes[1].clone(),
                      self.game.heroes[2].clone(),
