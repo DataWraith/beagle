@@ -52,47 +52,39 @@ impl Bot {
     }
 
     fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &Box<State>) -> u8 {
-        let mut best_pos = s.game.board.mine_pos[0];
-        let mut best_dist = 255;
-        for tpos in &s.game.board.mine_pos {
-            let t = s.game.board.tile_at(&tpos);
-            match t {
-                Tile::Mine(x) if x != player_id => {
-                    let dist = tpos.manhattan_distance(pos);
-                    if dist < best_dist {
-                        best_dist = dist;
-                        best_pos = *tpos;
+        {
+            let mut dist = HashMap::new();
+            let mut q = VecDeque::new();
+
+            q.push_back(*pos);
+            dist.insert(*pos, 0u8);
+
+            while !q.is_empty() {
+                let cur = q.pop_front().unwrap();
+                let nb = cur.neighbors();
+
+                for v in &(nb) {
+                    match s.game.board.tile_at(v) {
+                        Tile::Mine(x) if x != player_id => {
+                            return dist.get(&cur).unwrap() + 1;
+                        }
+
+                        Tile::Air => {
+                            if !dist.contains_key(v) {
+                                let child_dist = dist.get(&cur).unwrap() + 1;
+                                dist.insert(v.clone(), child_dist);
+                                q.push_back(v.clone())
+                            }
+                        }
+
+                        _ => (),
                     }
                 }
-                _ => (),
-            };
-        }
-
-        let mut min_dist = 255;
-        let initial_dist = s.game.board.shortest_path_length(pos, &best_pos, 255);
-        if initial_dist.is_some() {
-            min_dist = initial_dist.unwrap();
-        }
-
-        for tpos in &s.game.board.mine_pos {
-            let t = s.game.board.tile_at(&tpos);
-            match t {
-                Tile::Mine(x) if x != player_id => {
-                    let dist = s.game.board.shortest_path_length(pos, &tpos, min_dist);
-                    if dist.is_some() {
-                        min_dist = dist.unwrap();
-                    }
-                }
-                _ => (),
             }
         }
-
-        if min_dist == 255 {
-            return 0;
-        }
-
-        min_dist
+        0
     }
+
 
     fn initialize(&mut self, s: &Box<State>) {
         self.initialized = true;
