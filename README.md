@@ -35,7 +35,7 @@ tavern that is not the nearest one.
 * [X] Unmake moves instead of copying state around
 * [ ] Better Move Ordering
 * [ ] Ignore opponent moves if the opponent is on the other side of the map
-* [ ] Try a simple BFS for finding mines (might be faster)
+* [X] Try a simple BFS for finding mines (might be faster)
 
 [Vindinium]: http://vindinium.org
 [MTD(f)]: https://people.csail.mit.edu/plaat/mtdf.html
