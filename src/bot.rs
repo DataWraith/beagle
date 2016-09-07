@@ -203,6 +203,8 @@ impl Bot {
                 score = 1000;
             } else if *mv == self.killer1[depth as usize] || *mv == self.killer2[depth as usize] {
                 score = 100;
+            } else if *mv != Move::default() {
+                score = 10
             }
 
             if score > best_score {
