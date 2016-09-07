@@ -269,7 +269,7 @@ impl Bot {
 
         *nodes += 1;
 
-        if depth == 0 || s.game.turn == s.game.max_turns {
+        if depth == 0 || s.game.turn >= s.game.max_turns {
             g = self.eval(s);
         } else if s.game.turn % 4 == s.hero.id - 1 {
             let mut bscore = i32::min_value();
