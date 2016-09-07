@@ -136,7 +136,7 @@ impl Bot {
         }
 
 
-        (3i32 * pred_gold as i32 - neg_gold as i32)
+        (pred_gold as i32 - max_enemy_gold as i32)
     }
 
     fn generate_moves(&mut self, s: &mut Box<State>) -> Vec<Move> {
