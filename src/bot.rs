@@ -380,58 +380,37 @@ impl Bot {
                 mut num_nodes: &mut u64,
                 end_time: time::Timespec)
                 -> Option<i32> {
-        let mut g = firstguess;
+        let mut f = firstguess;
         let mut upper = i32::max_value();
         let mut lower = i32::min_value();
-        let mut beta: i32;
-        let mut direction = 1i32;
-        let mut step_size = 1i32;
-        loop {
-            if g == lower {
-                beta = g + step_size;
-            } else {
-                beta = g;
-            }
+        let mut step_size = 25i32;
 
-            let val = self.brs(s, beta - step_size, beta, depth, end_time, &mut num_nodes);
-
-            if val.is_none() {
+        while(upper == i32::max_value() || lower == i32::min_value()) {
+            let val = self.brs(s, f - 1, f, depth, end_time, &mut num_nodes);
+            if(val.is_none()){
                 return None;
             }
-            g = val.unwrap();
 
-            if g < beta {
-                if direction < 0i32 {
-                    direction = 1i32;
-                } else {
-                    direction += 1i32;
-                }
-                upper = g;
-                step_size = direction;
-                if step_size > 10i32 {
-                    step_size = 10i32;
-                }
+            let g = val.unwrap();
+
+            if (g < f) {
+                upper = g
             } else {
-                if direction > 0i32 {
-                    direction = -1i32;
-                } else {
-                    direction -= 1i32;
-                }
-
-                lower = g;
-
-                step_size = -direction;
-                if step_size > 10i32 {
-                    step_size = 10i32;
-                }
+                lower = g
             }
 
-            if lower >= upper {
-                break;
+            if (upper == g) {
+                f = g - step_size;
+            } else {
+                f = g + step_size;
             }
         }
-
-        Some(g)
+		
+		if (lower == upper) {
+			return Some(lower)
+		}
+		
+        self.brs(s, lower, upper, depth, end_time, &mut num_nodes)
     }
 
     pub fn choose_move(&mut self, s: &mut Box<State>) -> Direction {
