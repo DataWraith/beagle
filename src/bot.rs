@@ -109,17 +109,11 @@ impl Bot {
                 max_enemy_gold = hero_gold;
             }
 
-            neg_gold += hero_gold;
-        }
-
-        for h in &s.game.heroes {
-            if h.name == s.hero.name {
-                continue;
-            }
-
             if h.pos.manhattan_distance(&s.hero.pos) == 1 {
                 neg_gold += 25;
             }
+
+            neg_gold += hero_gold;
         }
 
 
