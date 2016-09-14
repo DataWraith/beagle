@@ -133,13 +133,13 @@ impl Bot {
         let mut eval = 0.0;
         for h in &s.game.heroes {
             if h.name == s.hero.name {
-                eval += rank_adj[h.id];
                 eval += pred_score[h.id];
             } else {
-                eval -= rank_adj[h.id];
                 eval -= pred_score[h.id];
             }
         }
+
+        eval += rank_adj[s.hero.id];
 
         (eval as i32)
     }
