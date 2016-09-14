@@ -92,51 +92,56 @@ impl Bot {
 
     fn eval(&mut self, s: &Box<State>) -> i32 {
         let turns_left = (s.game.max_turns - s.game.turn) / 4;
-        let mut pred_gold = (s.hero.gold as usize +
-                             s.hero.mine_count as usize * turns_left as usize) +
-                            s.hero.life as usize / 10;
-        let mut neg_gold = 0;
-        let mut max_enemy_gold = 0;
+        let mut pred_score = [0f64, 0f64, 0f64, 0f64, 0f64];
+        let mut rank_adj   = [0f64, 0f64, 0f64, 0f64, 0f64];
 
         for h in &s.game.heroes {
-            if h.name == s.hero.name {
-                continue;
-            }
-
-            let hero_gold = h.gold as usize + (1 + h.mine_count as usize) * turns_left;
-
-            if max_enemy_gold < hero_gold {
-                max_enemy_gold = hero_gold;
-            }
-
-            if h.pos.manhattan_distance(&s.hero.pos) == 1 {
-                neg_gold += 25;
-            }
-
-            neg_gold += hero_gold;
+            pred_score[h.id] = 10.0 * (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) + h.life as f64;
         }
 
+        for h in &s.game.heroes {
+            for enemy in &s.game.heroes {
+                if h.name == enemy.name {
+                    continue
+                }
 
+                let q_self = f64::powf(10.0, h.elo as f64/400.0);
+                let q_enemy = f64::powf(10.0, enemy.elo as f64/400.0);
+                let expected_self = q_self / (q_self + q_enemy);
+                let mut actual = 1.0;
+                if pred_score[h.id] < pred_score[enemy.id] {
+                    actual = 0.0;
+                } else if pred_score[h.id] == pred_score[enemy.id] {
+                    actual = 0.5;
+                }
+                rank_adj[h.id] += 16.0 * (actual - expected_self);
+            }
+        }
 
         let mdist = self.get_closest_mine_dist(&s.hero.pos, s.hero.id, s);
         let mut delay = 0 as usize;
-        if mdist > 0 && pred_gold < max_enemy_gold + 100 {
-            if s.hero.life < mdist || s.hero.life - mdist <= 20 {
-                let tdist = self.get_closest_tavern_dist(s, &s.hero.pos);
-                delay += 2 * tdist as usize;
-            }
-            delay += mdist as usize;
-        } else {
+        if s.hero.life < mdist || s.hero.life - mdist <= 20 {
             let tdist = self.get_closest_tavern_dist(s, &s.hero.pos);
-            delay += tdist as usize;
+            delay += 2 * tdist as usize;
         }
+        delay += mdist as usize;
 
         if delay < turns_left {
-            pred_gold += turns_left - delay;
+            rank_adj[s.hero.id] += (turns_left - delay) as f64;
         }
 
+        let mut eval = 0.0;
+        for h in &s.game.heroes {
+            if h.name == s.hero.name {
+                eval += rank_adj[h.id];
+                eval += pred_score[h.id];
+            } else {
+                eval -= rank_adj[h.id];
+                eval -= pred_score[h.id];
+            }
+        }
 
-        (pred_gold as i32 - max_enemy_gold as i32)
+        (eval as i32)
     }
 
     fn generate_moves(&mut self, s: &mut Box<State>) -> Vec<Move> {
@@ -405,11 +410,11 @@ impl Bot {
                 f = g + step_size;
             }
         }
-		
-		if (lower == upper) {
-			return Some(lower)
-		}
-		
+
+    if (lower == upper) {
+      return Some(lower)
+    }
+
         self.brs(s, lower, upper, depth, end_time, &mut num_nodes)
     }
 
