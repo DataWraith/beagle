@@ -139,7 +139,7 @@ impl Bot {
             }
         }
 
-        eval += rank_adj[s.hero.id];
+        eval += rank_adj[s.hero.id] * 10.0;
 
         (eval as i32)
     }
