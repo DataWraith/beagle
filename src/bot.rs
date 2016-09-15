@@ -268,13 +268,13 @@ impl Bot {
             }
         }
 
+        *nodes += 1;
+
         if (*nodes < 10u64 || *nodes & 1023u64 == 1023u64) && time::get_time() > end_time {
             return None;
         }
 
-        *nodes += 1;
-
-        if depth == 0 || s.game.turn >= s.game.max_turns {
+        if depth == 0 || s.game.turn > s.game.max_turns - 4 {
             g = self.eval(s);
         } else if s.game.turn % 4 == s.hero.id - 1 {
             let mut bscore = i32::min_value();
