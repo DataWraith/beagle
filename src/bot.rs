@@ -388,9 +388,9 @@ impl Bot {
         let mut f = firstguess;
         let mut upper = i32::max_value();
         let mut lower = i32::min_value();
-        let mut step_size = 25i32;
+        let step_size = 25i32;
 
-        while(upper == i32::max_value() || lower == i32::min_value()) {
+        while upper == i32::max_value() || lower == i32::min_value() {
             let val = self.brs(s, f - 1, f, depth, end_time, &mut num_nodes);
             if(val.is_none()){
                 return None;
@@ -463,13 +463,7 @@ impl Bot {
                     best_d = e.mv.directions[0];
                 }
             }
-
-
-
-
         }
-
-
 
         println!("{}, {} - {} - {} - {}, nodes: {}",
                  depth,
