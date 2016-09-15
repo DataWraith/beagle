@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use fnv::FnvHasher;
 
@@ -17,7 +17,6 @@ pub struct Bot {
     killer2: [Move; 33],
     tt: Table,
     tavern_dist: HashMap<Position, u8>,
-    mine_dist: HashMap<Position, Vec<(Position, u8, Direction)>>,
 }
 
 impl Bot {
@@ -28,14 +27,12 @@ impl Bot {
             tavern_dist: HashMap::new(),
             killer1: [Move::default(); 33],
             killer2: [Move::default(); 33],
-            mine_dist: HashMap::new(),
         }
     }
 
     fn get_closest_tavern_dist(&mut self, s: &Box<State>, pos: &Position) -> u8 {
         if !self.tavern_dist.contains_key(pos) {
             let mut min_dist = 255;
-            let mut min_dir = Direction::Stay;
 
             for tpos in &s.game.board.tavern_pos {
                 let new_d = s.game.board.shortest_path_length(pos, tpos, min_dist);
@@ -394,26 +391,26 @@ impl Bot {
 
         while upper == i32::max_value() || lower == i32::min_value() {
             let val = self.brs(s, f - 1, f, depth, end_time, &mut num_nodes);
-            if (val.is_none()) {
+            if val.is_none() {
                 return None;
             }
 
             let g = val.unwrap();
 
-            if (g < f) {
+            if g < f {
                 upper = g
             } else {
                 lower = g
             }
 
-            if (upper == g) {
+            if upper == g {
                 f = g - step_size;
             } else {
                 f = g + step_size;
             }
         }
 
-        if (lower == upper) {
+        if lower == upper {
             return Some(lower);
         }
 
