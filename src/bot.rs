@@ -30,7 +30,7 @@ impl Bot {
         }
     }
 
-    fn get_closest_tavern_dist(&mut self, s: &Box<State>, pos: &Position) -> u8 {
+    fn get_closest_tavern_dist(&mut self, s: &State, pos: &Position) -> u8 {
         if !self.tavern_dist.contains_key(pos) {
             let mut min_dist = 255;
 
@@ -48,7 +48,7 @@ impl Bot {
         return self.tavern_dist[pos];
     }
 
-    fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &Box<State>) -> u8 {
+    fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &State) -> u8 {
         {
             let mut dist = HashMap::new();
             let mut q = VecDeque::new();
@@ -83,11 +83,11 @@ impl Bot {
     }
 
 
-    fn initialize(&mut self, s: &Box<State>) {
+    fn initialize(&mut self, s: &State) {
         self.initialized = true;
     }
 
-    fn eval(&mut self, s: &Box<State>) -> i32 {
+    fn eval(&mut self, s: &State) -> i32 {
         let turns_left = (s.game.max_turns - s.game.turn) / 4;
         let mut pred_score = [0f64, 0f64, 0f64, 0f64, 0f64];
         let mut rank_adj = [0f64, 0f64, 0f64, 0f64, 0f64];
@@ -143,7 +143,7 @@ impl Bot {
         (eval as i32)
     }
 
-    fn generate_moves(&mut self, s: &mut Box<State>) -> Vec<Move> {
+    fn generate_moves(&mut self, s: &mut State) -> Vec<Move> {
         let mut result = Vec::with_capacity(12);
 
         // MAX node
@@ -224,7 +224,7 @@ impl Bot {
     }
 
     fn brs(&mut self,
-           s: &mut Box<State>,
+           s: &mut State,
            alphao: i32,
            betao: i32,
            depth: u8,
@@ -378,7 +378,7 @@ impl Bot {
     }
 
     pub fn mtdf(&mut self,
-                s: &mut Box<State>,
+                s: &mut State,
                 firstguess: i32,
                 depth: u8,
                 mut num_nodes: &mut u64,
@@ -417,7 +417,7 @@ impl Bot {
         self.brs(s, lower, upper, depth, end_time, &mut num_nodes)
     }
 
-    pub fn choose_move(&mut self, s: &mut Box<State>) -> Direction {
+    pub fn choose_move(&mut self, s: &mut State) -> Direction {
         let end_time = time::get_time() + time::Duration::milliseconds(750);
 
         if !self.initialized {

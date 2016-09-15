@@ -46,10 +46,10 @@ fn main() {
 
     res.read_to_string(&mut body).ok();
 
-    let mut state: Box<state::State> = serde_json::from_str(&body).unwrap();
+    let mut state : state::State  = serde_json::from_str(&body).unwrap();
     state.game.board.initialize();
 
-    let mut new_state: Box<state::State>;
+    let mut new_state: state::State;
 
     loop {
         let mv = bot.choose_move(&mut state);
