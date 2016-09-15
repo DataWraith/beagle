@@ -16,7 +16,6 @@ pub struct Bot {
     killer1: [Move; 33],
     killer2: [Move; 33],
     tt: Table,
-    tavern_dist: HashMap<Position, u8>,
 }
 
 impl Bot {
@@ -24,14 +23,12 @@ impl Bot {
         Bot {
             initialized: false,
             tt: Table::new(1000000u64),
-            tavern_dist: HashMap::new(),
             killer1: [Move::default(); 33],
             killer2: [Move::default(); 33],
         }
     }
 
     fn get_closest_tavern_dist(&mut self, s: &State, pos: &Position) -> u8 {
-        if !self.tavern_dist.contains_key(pos) {
             let mut min_dist = 255;
 
             for tpos in &s.game.board.tavern_pos {
@@ -41,35 +38,35 @@ impl Bot {
                 }
             }
 
-            self.tavern_dist.insert(*pos, min_dist as u8);
             return min_dist as u8;
-        }
-
-        return self.tavern_dist[pos];
     }
 
     fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &State) -> u8 {
         {
-            let mut dist = HashMap::new();
-            let mut q = VecDeque::new();
+            let mut dist = vec![255; (s.game.board.size as usize * s.game.board.size as usize)];
 
+            let mut q = VecDeque::new();
             q.push_back(*pos);
-            dist.insert(*pos, 0u8);
+
+            let idx = (s.game.board.size as usize) * (pos.x as usize) + (pos.y as usize);
+            dist[idx] = 0;
 
             while !q.is_empty() {
                 let cur = q.pop_front().unwrap();
+                let cur_idx = (s.game.board.size as usize) * (cur.x as usize) + (cur.y as usize);
                 let nb = cur.neighbors();
 
                 for v in &(nb) {
                     match s.game.board.tile_at(v) {
                         Tile::Mine(x) if x != player_id => {
-                            return dist.get(&cur).unwrap() + 1;
+                            return dist[cur_idx] + 1
                         }
 
                         Tile::Air => {
-                            if !dist.contains_key(v) {
-                                let child_dist = dist.get(&cur).unwrap() + 1;
-                                dist.insert(v.clone(), child_dist);
+                            let child_idx = (s.game.board.size as usize) * (v.x as usize) + (v.y as usize);
+                            if dist[child_idx] == 255 {
+                                let child_dist = dist[cur_idx] + 1;
+                                dist[child_idx] = child_dist;
                                 q.push_back(v.clone())
                             }
                         }
