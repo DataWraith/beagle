@@ -93,20 +93,22 @@ impl Bot {
     fn eval(&mut self, s: &Box<State>) -> i32 {
         let turns_left = (s.game.max_turns - s.game.turn) / 4;
         let mut pred_score = [0f64, 0f64, 0f64, 0f64, 0f64];
-        let mut rank_adj   = [0f64, 0f64, 0f64, 0f64, 0f64];
+        let mut rank_adj = [0f64, 0f64, 0f64, 0f64, 0f64];
 
         for h in &s.game.heroes {
-            pred_score[h.id] = 10.0 * (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) + h.life as f64;
+            pred_score[h.id] = 10.0 *
+                               (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) +
+                               h.life as f64;
         }
 
         for h in &s.game.heroes {
             for enemy in &s.game.heroes {
                 if h.name == enemy.name {
-                    continue
+                    continue;
                 }
 
-                let q_self = f64::powf(10.0, h.elo as f64/400.0);
-                let q_enemy = f64::powf(10.0, enemy.elo as f64/400.0);
+                let q_self = f64::powf(10.0, h.elo as f64 / 400.0);
+                let q_enemy = f64::powf(10.0, enemy.elo as f64 / 400.0);
                 let expected_self = q_self / (q_self + q_enemy);
                 let mut actual = 1.0;
                 if pred_score[h.id] < pred_score[enemy.id] {
@@ -392,7 +394,7 @@ impl Bot {
 
         while upper == i32::max_value() || lower == i32::min_value() {
             let val = self.brs(s, f - 1, f, depth, end_time, &mut num_nodes);
-            if(val.is_none()){
+            if (val.is_none()) {
                 return None;
             }
 
@@ -411,9 +413,9 @@ impl Bot {
             }
         }
 
-    if (lower == upper) {
-      return Some(lower)
-    }
+        if (lower == upper) {
+            return Some(lower);
+        }
 
         self.brs(s, lower, upper, depth, end_time, &mut num_nodes)
     }

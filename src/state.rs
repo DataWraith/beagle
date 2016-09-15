@@ -119,14 +119,14 @@ impl State {
                 self.game.board.tile_at(&self.game.heroes[self.game.turn % 4].pos.neighbor(*dir));
 
             match t {
-                Tile::Wall | Tile::Hero(_) => (),               
+                Tile::Wall | Tile::Hero(_) => (),
                 Tile::Mine(x) if x == h.id => (),
                 Tile::Air | Tile::Mine(_) => result.push(*dir),
                 Tile::Tavern => {
                     if h.gold >= 2 {
                         result.push(*dir);
                     }
-                }               
+                }
             }
         }
 
@@ -148,7 +148,7 @@ impl State {
         let mut hero_died = false;
 
         match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
-            Tile::Wall | Tile::Hero(_) => (),         
+            Tile::Wall | Tile::Hero(_) => (),
             Tile::Tavern => {
                 if self.game.heroes[h_idx].gold >= 2 {
                     self.game.heroes[h_idx].gold -= 2;
