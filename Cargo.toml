@@ -6,7 +6,7 @@ authors = ["Johannes Holzfuß <johannes@holzfuss.name>"]
 [dependencies]
 serde = "*"
 serde_json = "*"
-serde_macros = "*"
+serde_derive = "*"
 hyper = "0.9"
 time = "0.1"
 rand = "0.3"
