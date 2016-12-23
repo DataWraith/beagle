@@ -5,6 +5,8 @@ use std::hash::{Hash, Hasher};
 use fnv::FnvHasher;
 
 use std::collections::HashSet;
+use std::collections::HashMap;
+use std::collections::VecDeque;
 
 use tile::Tile;
 use position::Position;
@@ -140,91 +142,62 @@ impl Board {
         }
     }
 
-    // Hadlock's shortest path algorithm
+    // Fringe search
     pub fn shortest_path_length(&self,
                                 start: &Position,
                                 goal: &Position,
                                 max_dist: u8)
                                 -> Option<u8> {
-        // Step 1
-        let mut u = *start;
-        let mut d = 0u8;
-        let mut visited = HashSet::new();
-        let mut pos_stack = Vec::new();
-        let mut neg_stack = Vec::new();
+        
 
+        let mut fringe : VecDeque<Position> = VecDeque::new();
+        let mut dist : HashMap<Position, u8>= HashMap::new();
+        let mut flimit = start.manhattan_distance(goal);
 
-        if start.manhattan_distance(goal) as u8 >= max_dist {
-            return None;
-        }
+        dist.insert(*start, 0);
 
-        // Step 2
-        'outer: loop {
-            if u == *goal {
-                return Some(start.manhattan_distance(goal) as u8 + 2 * d);
-            }
+        while fringe.len() > 0 {
+            if flimit > max_dist as usize {
+				        return None;
+			      }
 
-            visited.insert(u);
+            let node = fringe.front().unwrap().clone();
+            let mut fmin = 0xFFFFFFFF as usize;
+            let mut g = dist[&node];
 
-            let mut num_pos = 0;
+            let f = (g + node.manhattan_distance(goal) as u8) as usize;
 
-            for v in &u.neighbors() {
-                match self.tile_at(v) {
-                    Tile::Wall | Tile::Hero(_) => (),
-                    Tile::Tavern | Tile::Mine(_) => {
-                        if v == goal {
-                            pos_stack.push(v.clone());
-                            num_pos += 1;
-                        }
-                    }
-                    Tile::Air => {
-                        if !visited.contains(v) {
-                            let dist_diff: i8 = u.manhattan_distance(goal) as i8 -
-                                                v.manhattan_distance(goal) as i8;
-                            if dist_diff < 0 {
-                                neg_stack.push(v.clone());
-                            } else {
-                                pos_stack.push(v.clone());
-                                num_pos += 1;
-                            }
-                        }
-                    }
+            if f > flimit {
+                if f < fmin {
+                    fmin = f;
+                    continue;
                 }
             }
 
-            if num_pos > 0 {
-                u = pos_stack.pop().unwrap().clone();
-                continue 'outer;
+            if node == *goal {
+                return Some(dist[goal] as u8);
             }
 
-            // Step 3
-            'step3: loop {
-                while !pos_stack.is_empty() {
-                    let v = pos_stack.pop().unwrap();
-                    if visited.contains(&v) {
+            let neighbors = node.neighbors();
+
+            for n in &neighbors {
+                let g_child = g + 1;
+                if(dist.contains_key(n)) {
+                    let g_cached = *dist.get(n).unwrap();
+                    if g_child > g_cached {
                         continue;
-                    } else {
-                        u = v.clone();
-                        continue 'outer;
                     }
                 }
 
-                // Step 4
-                if !neg_stack.is_empty() {
-                    pos_stack = neg_stack.clone();
-                    neg_stack = Vec::new();
-                    d += 1;
-                    if start.manhattan_distance(goal) as u8 + 2 * d >= max_dist {
-                        return None;
-                    }
-                    continue 'step3;
-                } else {
-                    break;
-                }
+                fringe.insert(1, n.clone());
+                let pdist = dist.get(&node).unwrap().clone();
+                dist.insert(n.clone(), pdist + 1);
+                fringe.pop_front();
             }
 
-            // Step 5
-            return None;
+            flimit = fmin;
         }
+
+        return None;
     }
 }
