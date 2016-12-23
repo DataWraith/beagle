@@ -415,7 +415,7 @@ impl Bot {
     }
 
     pub fn choose_move(&mut self, s: &mut State) -> Direction {
-        let end_time = time::get_time() + time::Duration::milliseconds(750);
+        let end_time = time::get_time() + time::Duration::milliseconds(500);
 
         if !self.initialized {
             self.initialize(s);
