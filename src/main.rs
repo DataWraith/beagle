@@ -1,11 +1,15 @@
-#![feature(custom_derive, plugin, box_patterns)]
-#![plugin(serde_macros)]
+#![feature(custom_attribute,custom_derive,proc_macro)]
 
 extern crate time;
 extern crate rand;
-extern crate serde_json;
 extern crate hyper;
 extern crate fnv;
+
+#[macro_use]
+extern crate serde_derive;
+
+extern crate serde_json;
+
 
 mod direction;
 mod mv;
