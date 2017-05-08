@@ -80,9 +80,16 @@ impl State {
             self.game.board.put_tile(pos, Tile::Mine(killer_id));
         }
 
+        let old_pos = &self.game.heroes[hero_id - 1].pos.clone();
+        let new_pos = &self.game.heroes[hero_id - 1].spawn_pos.clone();
+        self.game.heroes[hero_id - 1].pos = *new_pos;
+        self.game.heroes[hero_id - 1].life = 100;
+
+        umi.tiles.push((*old_pos, Tile::Hero(hero_id)));
+        self.game.board.put_tile(old_pos, Tile::Air);
+
         for i in 1..4 {
-            if self.game.heroes[((hero_id - 1) + i) % 4].pos ==
-               self.game.heroes[hero_id - 1].spawn_pos {
+            if self.game.heroes[((hero_id - 1) + i) % 4].pos == self.game.heroes[hero_id - 1].spawn_pos {
                 let killed_id = self.game.heroes[((hero_id - 1) + i) % 4].id;
                 {
                     self.kill(killed_id, hero_id, umi)
@@ -90,15 +97,8 @@ impl State {
             }
         }
 
-        let old_pos = &self.game.heroes[hero_id - 1].pos.clone();
-        let new_pos = &self.game.heroes[hero_id - 1].spawn_pos.clone();
-
-        umi.tiles.push((*old_pos, Tile::Hero(hero_id)));
-        self.game.board.put_tile(old_pos, Tile::Air);
-        umi.tiles.push((*new_pos, Tile::Air));
+        umi.tiles.push((*new_pos, self.game.board.tile_at(new_pos)));
         self.game.board.put_tile(new_pos, Tile::Hero(hero_id));
-        self.game.heroes[hero_id - 1].pos = *new_pos;
-        self.game.heroes[hero_id - 1].life = 100;
     }
 
     pub fn get_moves(&self) -> Vec<Direction> {
