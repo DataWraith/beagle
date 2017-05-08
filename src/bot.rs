@@ -28,58 +28,6 @@ impl Bot {
         }
     }
 
-    fn get_closest_tavern_dist(&mut self, s: &State, pos: &Position) -> u8 {
-            let mut min_dist = 255;
-
-            for tpos in &s.game.board.tavern_pos {
-                let new_d = s.game.board.shortest_path_length(pos, tpos, min_dist);
-                if new_d.is_some() {
-                    min_dist = new_d.unwrap();
-                }
-            }
-
-            return min_dist as u8;
-    }
-
-    fn get_closest_mine_dist(&mut self, pos: &Position, player_id: usize, s: &State) -> u8 {
-        {
-            let mut dist = vec![255; (s.game.board.size as usize * s.game.board.size as usize)];
-
-            let mut q = VecDeque::new();
-            q.push_back(*pos);
-
-            let idx = (s.game.board.size as usize) * (pos.x as usize) + (pos.y as usize);
-            dist[idx] = 0;
-
-            while !q.is_empty() {
-                let cur = q.pop_front().unwrap();
-                let cur_idx = (s.game.board.size as usize) * (cur.x as usize) + (cur.y as usize);
-                let nb = cur.neighbors();
-
-                for v in &(nb) {
-                    match s.game.board.tile_at(v) {
-                        Tile::Mine(x) if x != player_id => {
-                            return dist[cur_idx] + 1
-                        }
-
-                        Tile::Air => {
-                            let child_idx = (s.game.board.size as usize) * (v.x as usize) + (v.y as usize);
-                            if dist[child_idx] == 255 {
-                                let child_dist = dist[cur_idx] + 1;
-                                dist[child_idx] = child_dist;
-                                q.push_back(v.clone())
-                            }
-                        }
-
-                        _ => (),
-                    }
-                }
-            }
-        }
-        0
-    }
-
-
     fn initialize(&mut self, s: &State) {
         self.initialized = true;
     }
