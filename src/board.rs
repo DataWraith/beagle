@@ -1,6 +1,8 @@
 use std::fmt;
 use std::hash;
 use std::hash::{Hash, Hasher};
+use std::collections::VecDeque;
+use std::cmp;
 
 use fnv::FnvHasher;
 
@@ -9,6 +11,7 @@ use std::collections::HashSet;
 use tile::Tile;
 use position::Position;
 use zobrist::ZOBRIST;
+use direction::Direction;
 
 #[derive(Clone, Deserialize, Debug, Eq)]
 pub struct Board {
@@ -24,6 +27,13 @@ pub struct Board {
     pub tavern_pos: Vec<Position>,
     #[serde(default)]
     pub hash: u64,
+
+    #[serde(default)]
+    pathcache: Vec<Vec<u8>>,
+    #[serde(default)]
+    minecache: Vec<(u8, Position)>,
+    #[serde(default)]
+    pub max_dist: u8,
 }
 
 impl hash::Hash for Board {
@@ -62,8 +72,7 @@ impl fmt::Display for Board {
                 }
             }
         }
-        Ok(())
-    }
+        Ok(())}
 }
 
 impl Board {
@@ -114,7 +123,145 @@ impl Board {
             }
         }
 
+        self.pathcache = vec![Vec::new(); self.size as usize * self.size as usize];
+	self.minecache = vec![(0u8, Position{x:0, y:0}); self.size as usize * self.size as usize];
         self.initialized = true;
+    }
+
+    fn position_idx(&self, pos: &Position) -> usize {
+        return pos.x as usize * (self.size as usize) + pos.y as usize;
+    }
+
+    fn bfs(&mut self, start: &Position) -> Vec<u8>{
+        let mut dist = vec![255; (self.size as usize) * (self.size as usize)];
+        dist[self.position_idx(start)] = 0;
+
+        match self.tile_at(start) {
+            Tile::Tavern | Tile::Mine(_) | Tile::Wall => { return dist },
+            _ => {},
+        }
+
+        let mut q = VecDeque::new();
+        q.push_back(*start);
+
+        while !q.is_empty() {
+            let cur = q.pop_front().unwrap();
+            let cur_idx = self.position_idx(&cur);
+            let nb = cur.neighbors();
+
+            for v in &nb {
+                match self.tile_at(v) {
+                    Tile::Air | Tile::Hero(_) => {
+                        let cidx = self.position_idx(v);
+                        if dist[cidx] == 255 {
+			    self.max_dist = cmp::max(self.max_dist, dist[cur_idx] + 1);
+                            dist[cidx] = dist[cur_idx] + 1;
+                            q.push_back(v.clone());
+                        }
+                    },
+
+                    Tile::Tavern | Tile::Mine(_) => {
+                        let cidx = self.position_idx(v);
+                        if dist[cidx] == 255 {
+			    self.max_dist = cmp::max(self.max_dist, dist[cur_idx] + 1);
+                            dist[cidx] = dist[cur_idx] + 1;
+                        }
+                    },
+
+                    _ => {},
+                }
+            }
+        }
+
+        return dist
+    }
+
+    pub fn direction_to(&mut self, from: &Position, to: &Position) -> Direction {
+        let mut min_dist = 255u8;
+        let mut min_dir  = Direction::Stay;
+
+        for dir in &[Direction::North, Direction::East, Direction::South, Direction::West] {
+            let n = from.neighbor(*dir);
+
+	    if n.x < 0 || n.y < 0 || n.x >= self.size || n.y >= self.size {
+	      continue;
+	    }
+
+            let dist = self.shortest_path_length(&n, to);
+
+            if dist < min_dist {
+                min_dist = dist;
+                min_dir = *dir;
+            }
+        }
+
+        min_dir
+    }
+
+    pub fn get_closest_tavern(&mut self, pos: &Position) -> (u8, Position) {
+        let mut min_dist = 255;
+        let mut resultpos = Position{x: 0, y: 0};
+
+        for tpos in &self.tavern_pos.clone() {
+            let new_d = self.shortest_path_length(pos, &tpos);
+            if min_dist > new_d {
+                resultpos = *tpos;
+                min_dist = new_d;
+            }
+        }
+
+        (min_dist, resultpos)
+    }
+
+    pub fn get_closest_mine(&mut self, pos: &Position, player_id: usize) -> (u8, Option<Position>) {
+        let start_idx = self.position_idx(pos);
+
+	if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
+		return (255, None);
+	}
+
+	if self.minecache[start_idx].0 == 0u8 {
+		let mut min_dist = 255u8;
+		let mut mpos = Position{x: 0, y:0}; 
+
+		for mp in &self.mine_pos.clone() {
+			let d = self.shortest_path_length(pos, &mp);
+			if d < min_dist {
+				min_dist = d;
+				mpos = *mp;
+			}
+		}
+
+		self.minecache[start_idx] = (min_dist, mpos);
+	}
+
+	if let Tile::Mine(x) = self.tile_at(&self.minecache[start_idx].1) {
+		if x != player_id {
+			return (self.minecache[start_idx].0, Some(self.minecache[start_idx].1));
+		}
+	}
+
+        let mut min_dist = 255u8;
+        let mut mpos = None;
+
+        for mp in &self.mine_pos.clone() {
+            let tile = self.tile_at(&mp);
+
+            match tile {
+                Tile::Mine(x) if x != player_id => {
+                    let new_d = self.shortest_path_length(pos, &mp);
+                    if min_dist > new_d {
+                        min_dist = new_d;
+                        mpos = Some(*mp)
+                    }
+                },
+
+                _ => {},
+            }
+
+        }
+
+        (min_dist, mpos)
     }
 
     pub fn tile_at(&self, pos: &Position) -> Tile {
@@ -140,91 +287,27 @@ impl Board {
         }
     }
 
-    // Hadlock's shortest path algorithm
-    pub fn shortest_path_length(&self,
-                                start: &Position,
-                                goal: &Position,
-                                max_dist: u8)
-                                -> Option<u8> {
-        // Step 1
-        let mut u = *start;
-        let mut d = 0u8;
-        let mut visited = HashSet::new();
-        let mut pos_stack = Vec::new();
-        let mut neg_stack = Vec::new();
-
-
-        if start.manhattan_distance(goal) as u8 >= max_dist {
-            return None;
+    pub fn shortest_path_length(&mut self, start: &Position, goal: &Position) -> u8 {
+        if !self.initialized {
+            panic!("shortest_path_length called on uninitialized board")
         }
 
-        // Step 2
-        'outer: loop {
-            if u == *goal {
-                return Some(start.manhattan_distance(goal) as u8 + 2 * d);
-            }
+        let start_idx = self.position_idx(start);
+        let goal_idx = self.position_idx(goal);
 
-            visited.insert(u);
+	if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
+		return 255
+	}
 
-            let mut num_pos = 0;
+	if goal_idx < 0 || goal_idx >= (self.size as usize) * (self.size as usize) {
+		return 255
+	}
 
-            for v in &u.neighbors() {
-                match self.tile_at(v) {
-                    Tile::Wall | Tile::Hero(_) => (),
-                    Tile::Tavern | Tile::Mine(_) => {
-                        if v == goal {
-                            pos_stack.push(v.clone());
-                            num_pos += 1;
-                        }
-                    }
-                    Tile::Air => {
-                        if !visited.contains(v) {
-                            let dist_diff: i8 = u.manhattan_distance(goal) as i8 -
-                                                v.manhattan_distance(goal) as i8;
-                            if dist_diff < 0 {
-                                neg_stack.push(v.clone());
-                            } else {
-                                pos_stack.push(v.clone());
-                                num_pos += 1;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if num_pos > 0 {
-                u = pos_stack.pop().unwrap().clone();
-                continue 'outer;
-            }
-
-            // Step 3
-            'step3: loop {
-                while !pos_stack.is_empty() {
-                    let v = pos_stack.pop().unwrap();
-                    if visited.contains(&v) {
-                        continue;
-                    } else {
-                        u = v.clone();
-                        continue 'outer;
-                    }
-                }
-
-                // Step 4
-                if !neg_stack.is_empty() {
-                    pos_stack = neg_stack.clone();
-                    neg_stack = Vec::new();
-                    d += 1;
-                    if start.manhattan_distance(goal) as u8 + 2 * d >= max_dist {
-                        return None;
-                    }
-                    continue 'step3;
-                } else {
-                    break;
-                }
-            }
-
-            // Step 5
-            return None;
+        if self.pathcache[start_idx].is_empty() {
+            let tree = self.bfs(start);
+            self.pathcache[start_idx] = tree;
         }
+
+        self.pathcache[start_idx][goal_idx]
     }
 }
