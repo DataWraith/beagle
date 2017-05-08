@@ -32,15 +32,13 @@ impl Bot {
         self.initialized = true;
     }
 
-    fn eval(&mut self, s: &State) -> i32 {
+    fn eval(&mut self, s: &mut State) -> i32 {
         let turns_left = (s.game.max_turns - s.game.turn) / 4;
         let mut pred_score = [0f64, 0f64, 0f64, 0f64, 0f64];
         let mut rank_adj = [0f64, 0f64, 0f64, 0f64, 0f64];
 
         for h in &s.game.heroes {
-            pred_score[h.id] = 10.0 *
-                               (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) +
-                               h.life as f64;
+            pred_score[h.id] = (h.gold as f64 + (h.mine_count as usize * turns_left) as f64);
         }
 
         for h in &s.game.heroes {
@@ -62,28 +60,27 @@ impl Bot {
             }
         }
 
-        let mdist = self.get_closest_mine_dist(&s.hero.pos, s.hero.id, s);
+        let (mdist, mpos) = s.game.board.get_closest_mine(&s.hero.pos, s.hero.id);
         let mut delay = 0 as usize;
         if s.hero.life < mdist || s.hero.life - mdist <= 20 {
-            let tdist = self.get_closest_tavern_dist(s, &s.hero.pos);
+            let (tdist, tpos) = s.game.board.get_closest_tavern(&s.hero.pos);
             delay += 2 * tdist as usize;
         }
         delay += mdist as usize;
 
         if delay < turns_left {
-            rank_adj[s.hero.id] += (turns_left - delay) as f64;
+            pred_score[s.hero.id] += (turns_left - delay) as f64;
         }
 
         let mut eval = 0.0;
         for h in &s.game.heroes {
             if h.name == s.hero.name {
                 eval += pred_score[h.id];
+                eval += rank_adj[h.id] * 10000.0;
             } else {
                 eval -= pred_score[h.id];
             }
         }
-
-        eval += rank_adj[s.hero.id] * 10.0;
 
         (eval as i32)
     }
@@ -279,6 +276,7 @@ impl Bot {
                 if v.is_none() {
                     return None;
                 }
+
                 let score = v.unwrap();
                 if score < bscore {
                     bmove = curmove;
@@ -363,7 +361,7 @@ impl Bot {
     }
 
     pub fn choose_move(&mut self, s: &mut State) -> Direction {
-        let end_time = time::get_time() + time::Duration::milliseconds(500);
+        let end_time = time::get_time() + time::Duration::milliseconds(800);
 
         if !self.initialized {
             self.initialize(s);
