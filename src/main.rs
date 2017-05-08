@@ -1,5 +1,3 @@
-#![feature(custom_attribute,custom_derive,proc_macro)]
-
 extern crate time;
 extern crate rand;
 extern crate hyper;
