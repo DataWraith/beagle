@@ -11,15 +11,18 @@ use transposition_table::{Table, Entry};
 use lru::LRU;
 
 pub struct Bot {
+    initialized: bool,
     threat_list: [u8; 4],
     max_history: LRU<(Position, Direction)>,
     min_history: LRU<(u8, Position, Direction)>,
     tt: Table,
+    elo_cache: [[[f64; 3]; 4]; 4],
 }
 
 impl Bot {
     pub fn new() -> Bot {
         Bot {
+            initialized: false,
             threat_list: [1, 2, 3, 0],
             tt: Table::new(10000000u64),
             max_history: LRU::<(Position, Direction)>::new((Position { x: -1, y: -1 },
@@ -27,6 +30,8 @@ impl Bot {
             min_history: LRU::<(u8, Position, Direction)>::new((4,
                                                                 Position { x: -1, y: -1 },
                                                                 Direction::Stay)),
+
+            elo_cache: [[[0f64; 3]; 4]; 4],
         }
     }
 
@@ -55,21 +60,18 @@ impl Bot {
         }
 
         for h in &s.game.heroes {
-            for enemy in &s.game.heroes {
-                if h.name == enemy.name {
-                    continue;
+            for e in &s.game.heroes {
+                if h.elo == e.elo {
+                    continue
                 }
 
-                let q_self = f64::powf(10.0, h.elo as f64 / 400.0);
-                let q_enemy = f64::powf(10.0, enemy.elo as f64 / 400.0);
-                let expected_self = q_self / (q_self + q_enemy);
-                let mut actual = 1.0;
-                if pred_score[h.id] < pred_score[enemy.id] {
-                    actual = 0.0;
-                } else if pred_score[h.id] == pred_score[enemy.id] {
-                    actual = 0.5;
+                if pred_score[h.id] > pred_score[e.id] {
+                    rank_adj[h.id] += self.elo_cache[h.id - 1][e.id - 1][0];
+                } else if pred_score[h.id] == pred_score[e.id] {
+                    rank_adj[h.id] += self.elo_cache[h.id - 1][e.id - 1][1];
+                } else {
+                    rank_adj[h.id] += self.elo_cache[h.id - 1][e.id - 1][2];
                 }
-                rank_adj[h.id] += 16.0 * (actual - expected_self);
             }
         }
 
@@ -438,6 +440,26 @@ impl Bot {
 
     pub fn choose_move(&mut self, s: &mut State) -> Direction {
         let end_time = time::get_time() + time::Duration::milliseconds(800);
+
+        if !self.initialized {
+            for h in &s.game.heroes {
+                for enemy in &s.game.heroes {
+                    if h.elo == enemy.elo {
+                        continue;
+                    }
+
+                    let q_self = f64::powf(10.0, h.elo as f64 / 400.0);
+                    let q_enemy = f64::powf(10.0, enemy.elo as f64 / 400.0);
+                    let expected_self = q_self / (q_self + q_enemy);
+
+                    self.elo_cache[s.hero.id - 1][enemy.id - 1][0] = 16.0 * (1.0 - expected_self);
+                    self.elo_cache[s.hero.id - 1][enemy.id - 1][1] = 16.0 * (0.5 - expected_self);
+                    self.elo_cache[s.hero.id - 1][enemy.id - 1][2] = 16.0 * (0.0 - expected_self);
+                }
+            }
+
+            self.initialized = true;
+        }
 
         // Clear history
         self.max_history = LRU::new((Position { x: -1, y: -1 }, Direction::Stay));
