@@ -6,8 +6,6 @@ use std::cmp;
 
 use fnv::FnvHasher;
 
-use std::collections::HashSet;
-
 use tile::Tile;
 use position::Position;
 use zobrist::ZOBRIST;
@@ -72,7 +70,8 @@ impl fmt::Display for Board {
                 }
             }
         }
-        Ok(())}
+        Ok(())
+    }
 }
 
 impl Board {
@@ -124,7 +123,7 @@ impl Board {
         }
 
         self.pathcache = vec![Vec::new(); self.size as usize * self.size as usize];
-	self.minecache = vec![(0u8, Position{x:0, y:0}); self.size as usize * self.size as usize];
+        self.minecache = vec![(0u8, Position{x:0, y:0}); self.size as usize * self.size as usize];
         self.initialized = true;
     }
 
@@ -132,13 +131,13 @@ impl Board {
         return pos.x as usize * (self.size as usize) + pos.y as usize;
     }
 
-    fn bfs(&mut self, start: &Position) -> Vec<u8>{
+    fn bfs(&mut self, start: &Position) -> Vec<u8> {
         let mut dist = vec![255; (self.size as usize) * (self.size as usize)];
         dist[self.position_idx(start)] = 0;
 
         match self.tile_at(start) {
-            Tile::Tavern | Tile::Mine(_) | Tile::Wall => { return dist },
-            _ => {},
+            Tile::Tavern | Tile::Mine(_) | Tile::Wall => return dist,
+            _ => {}
         }
 
         let mut q = VecDeque::new();
@@ -154,38 +153,41 @@ impl Board {
                     Tile::Air | Tile::Hero(_) => {
                         let cidx = self.position_idx(v);
                         if dist[cidx] == 255 {
-			    self.max_dist = cmp::max(self.max_dist, dist[cur_idx] + 1);
+                            self.max_dist = cmp::max(self.max_dist, dist[cur_idx] + 1);
                             dist[cidx] = dist[cur_idx] + 1;
                             q.push_back(v.clone());
                         }
-                    },
+                    }
 
                     Tile::Tavern | Tile::Mine(_) => {
                         let cidx = self.position_idx(v);
                         if dist[cidx] == 255 {
-			    self.max_dist = cmp::max(self.max_dist, dist[cur_idx] + 1);
+                            self.max_dist = cmp::max(self.max_dist, dist[cur_idx] + 1);
                             dist[cidx] = dist[cur_idx] + 1;
                         }
-                    },
+                    }
 
-                    _ => {},
+                    _ => {}
                 }
             }
         }
 
-        return dist
+        return dist;
     }
 
     pub fn direction_to(&mut self, from: &Position, to: &Position) -> Direction {
         let mut min_dist = 255u8;
-        let mut min_dir  = Direction::Stay;
+        let mut min_dir = Direction::Stay;
 
-        for dir in &[Direction::North, Direction::East, Direction::South, Direction::West] {
+        for dir in &[Direction::North,
+                     Direction::East,
+                     Direction::South,
+                     Direction::West] {
             let n = from.neighbor(*dir);
 
-	    if n.x < 0 || n.y < 0 || n.x >= self.size || n.y >= self.size {
-	      continue;
-	    }
+            if n.x < 0 || n.y < 0 || n.x >= self.size || n.y >= self.size {
+                continue;
+            }
 
             let dist = self.shortest_path_length(&n, to);
 
@@ -200,7 +202,7 @@ impl Board {
 
     pub fn get_closest_tavern(&mut self, pos: &Position) -> (u8, Position) {
         let mut min_dist = 255;
-        let mut resultpos = Position{x: 0, y: 0};
+        let mut resultpos = Position { x: 0, y: 0 };
 
         for tpos in &self.tavern_pos.clone() {
             let new_d = self.shortest_path_length(&pos, tpos);
@@ -216,13 +218,13 @@ impl Board {
     pub fn get_closest_mine(&mut self, pos: &Position, player_id: usize) -> (u8, Option<Position>) {
         let start_idx = self.position_idx(pos);
 
-        if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
+        if start_idx >= (self.size as usize) * (self.size as usize) {
             return (255, None);
         }
 
         if self.minecache[start_idx].0 == 0u8 {
             let mut min_dist = 255u8;
-            let mut mpos = Position{x: 0, y:0}; 
+            let mut mpos = Position { x: 0, y: 0 };
 
             for mp in &self.mine_pos.clone() {
                 let d = self.shortest_path_length(pos, &mp);
@@ -236,10 +238,10 @@ impl Board {
         }
 
         if let Tile::Mine(x) = self.tile_at(&self.minecache[start_idx].1) {
-		        if x != player_id {
-			          return (self.minecache[start_idx].0, Some(self.minecache[start_idx].1));
-		        }
-	      }
+            if x != player_id {
+                return (self.minecache[start_idx].0, Some(self.minecache[start_idx].1));
+            }
+        }
 
         let mut min_dist = 255u8;
         let mut mpos = None;
@@ -254,9 +256,9 @@ impl Board {
                         min_dist = new_d;
                         mpos = Some(*mp)
                     }
-                },
+                }
 
-                _ => {},
+                _ => {}
             }
 
         }
@@ -295,13 +297,13 @@ impl Board {
         let start_idx = self.position_idx(start);
         let goal_idx = self.position_idx(goal);
 
-        if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
-            return 255
+        if start_idx >= (self.size as usize) * (self.size as usize) {
+            return 255;
         }
 
-        if goal_idx < 0 || goal_idx >= (self.size as usize) * (self.size as usize) {
-		        return 255
-	      }
+        if goal_idx >= (self.size as usize) * (self.size as usize) {
+            return 255;
+        }
 
         if !self.pathcache[start_idx].is_empty() {
             return self.pathcache[start_idx][goal_idx];

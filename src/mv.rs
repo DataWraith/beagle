@@ -8,6 +8,12 @@ pub struct Move {
 
 impl Default for Move {
     fn default() -> Move {
-        Move { player: 0, directions: [Direction::Stay, Direction::Stay, Direction::Stay, Direction::Stay] }
+        Move {
+            player: 0,
+            directions: [Direction::Stay,
+                         Direction::Stay,
+                         Direction::Stay,
+                         Direction::Stay],
+        }
     }
 }

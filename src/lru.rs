@@ -4,7 +4,7 @@ pub struct LRU<T> {
     lrus: [u32; 20],
 }
 
-impl <T:Copy + Eq> LRU<T> {
+impl<T: Copy + Eq> LRU<T> {
     pub fn new(default_entry: T) -> LRU<T> {
         LRU {
             cur: 1,
@@ -19,7 +19,7 @@ impl <T:Copy + Eq> LRU<T> {
                 let result = self.cur - self.lrus[i];
                 self.lrus[i] = self.cur;
                 self.cur += 1;
-                return result
+                return result;
             }
         }
 
@@ -34,7 +34,7 @@ impl <T:Copy + Eq> LRU<T> {
             if self.keys[i] == entry {
                 self.lrus[i] = self.cur;
                 self.cur += 1;
-                return
+                return;
             }
 
             if self.lrus[i] < min_lru {
@@ -42,7 +42,7 @@ impl <T:Copy + Eq> LRU<T> {
                 min_lru = self.lrus[i];
 
                 if min_lru == 0 {
-                    break
+                    break;
                 }
             }
         }
@@ -52,4 +52,3 @@ impl <T:Copy + Eq> LRU<T> {
         self.cur += 1;
     }
 }
-

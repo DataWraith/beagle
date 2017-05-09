@@ -89,7 +89,8 @@ impl State {
         self.game.board.put_tile(old_pos, Tile::Air);
 
         for i in 1..4 {
-            if self.game.heroes[((hero_id - 1) + i) % 4].pos == self.game.heroes[hero_id - 1].spawn_pos {
+            if self.game.heroes[((hero_id - 1) + i) % 4].pos ==
+               self.game.heroes[hero_id - 1].spawn_pos {
                 let killed_id = self.game.heroes[((hero_id - 1) + i) % 4].id;
                 {
                     self.kill(killed_id, hero_id, umi)
@@ -97,7 +98,8 @@ impl State {
             }
         }
 
-        umi.tiles.push((*new_pos, self.game.board.tile_at(new_pos)));
+        umi.tiles
+            .push((*new_pos, self.game.board.tile_at(new_pos)));
         self.game.board.put_tile(new_pos, Tile::Hero(hero_id));
     }
 
@@ -114,9 +116,13 @@ impl State {
             return result;
         }
 
-        for dir in &[Direction::North, Direction::East, Direction::South, Direction::West] {
-            let t =
-                self.game.board.tile_at(&self.game.heroes[self.game.turn % 4].pos.neighbor(*dir));
+        for dir in &[Direction::North,
+                     Direction::East,
+                     Direction::South,
+                     Direction::West] {
+            let t = self.game
+                .board
+                .tile_at(&self.game.heroes[self.game.turn % 4].pos.neighbor(*dir));
 
             match t {
                 Tile::Wall | Tile::Hero(_) => (),
@@ -147,7 +153,9 @@ impl State {
         let h_idx = (self.game.turn % 4) as usize;
         let mut hero_died = false;
 
-        match self.game.board.tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
+        match self.game
+                  .board
+                  .tile_at(&self.game.heroes[h_idx].pos.neighbor(direction)) {
             Tile::Wall | Tile::Hero(_) => (),
             Tile::Tavern => {
                 if self.game.heroes[h_idx].gold >= 2 {
@@ -159,11 +167,19 @@ impl State {
                 }
             }
             Tile::Air => {
-                result.tiles.push((self.game.heroes[h_idx].pos, Tile::Hero(h_idx + 1)));
-                self.game.board.put_tile(&self.game.heroes[h_idx].pos, Tile::Air);
-                result.tiles.push((self.game.heroes[h_idx].pos.neighbor(direction), Tile::Air));
-                self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction),
-                                         Tile::Hero(h_idx + 1));
+                result
+                    .tiles
+                    .push((self.game.heroes[h_idx].pos, Tile::Hero(h_idx + 1)));
+                self.game
+                    .board
+                    .put_tile(&self.game.heroes[h_idx].pos, Tile::Air);
+                result
+                    .tiles
+                    .push((self.game.heroes[h_idx].pos.neighbor(direction), Tile::Air));
+                self.game
+                    .board
+                    .put_tile(&self.game.heroes[h_idx].pos.neighbor(direction),
+                              Tile::Hero(h_idx + 1));
                 self.game.heroes[h_idx].pos = self.game.heroes[h_idx].pos.neighbor(direction);
             }
             Tile::Mine(hero_id) => {
@@ -177,12 +193,18 @@ impl State {
                         }
                         self.game.heroes[h_idx].mine_count += 1;
                         self.game.heroes[h_idx].life -= 20;
-                        result.tiles.push((self.game.heroes[h_idx].pos.neighbor(direction),
-                                           self.game
+                        result
+                            .tiles
+                            .push((self.game.heroes[h_idx].pos.neighbor(direction),
+                                   self.game
+                                       .board
+                                       .tile_at(&self.game.heroes[h_idx]
+                                                     .pos
+                                                     .neighbor(direction))));
+                        self.game
                             .board
-                            .tile_at(&self.game.heroes[h_idx].pos.neighbor(direction))));
-                        self.game.board.put_tile(&self.game.heroes[h_idx].pos.neighbor(direction),
-                                                 Tile::Mine(h_idx + 1));
+                            .put_tile(&self.game.heroes[h_idx].pos.neighbor(direction),
+                                      Tile::Mine(h_idx + 1));
                     }
                 }
             }
@@ -194,7 +216,9 @@ impl State {
                     continue;
                 }
 
-                if self.game.heroes[i].pos.manhattan_distance(&self.game.heroes[h_idx].pos) == 1 {
+                if self.game.heroes[i]
+                       .pos
+                       .manhattan_distance(&self.game.heroes[h_idx].pos) == 1 {
                     if self.game.heroes[i].life <= 20 {
                         self.kill(i + 1, h_idx + 1, &mut result);
                     } else {

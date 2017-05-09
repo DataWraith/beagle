@@ -1,4 +1,3 @@
-use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use fnv::FnvHasher;
 
@@ -8,12 +7,10 @@ use state::State;
 use direction::Direction;
 use mv::Move;
 use position::Position;
-use tile::Tile;
 use transposition_table::{Table, Entry};
 use lru::LRU;
 
 pub struct Bot {
-    initialized: bool,
     threat_list: [u8; 4],
     max_history: LRU<(Position, Direction)>,
     min_history: LRU<(u8, Position, Direction)>,
@@ -23,16 +20,14 @@ pub struct Bot {
 impl Bot {
     pub fn new() -> Bot {
         Bot {
-            initialized: false,
             threat_list: [1, 2, 3, 0],
             tt: Table::new(10000000u64),
-            max_history: LRU::<(Position, Direction)>::new((Position{x: -1, y: -1}, Direction::Stay)),
-            min_history: LRU::<(u8, Position, Direction)>::new((4, Position{x: -1, y: -1}, Direction::Stay)),
+            max_history: LRU::<(Position, Direction)>::new((Position { x: -1, y: -1 },
+                                                            Direction::Stay)),
+            min_history: LRU::<(u8, Position, Direction)>::new((4,
+                                                                Position { x: -1, y: -1 },
+                                                                Direction::Stay)),
         }
-    }
-
-    fn initialize(&mut self, s: &State) {
-        self.initialized = true;
     }
 
     fn eval(&mut self, s: &mut State) -> i32 {
@@ -43,7 +38,8 @@ impl Bot {
         let mut eval = 0.0;
 
         for h in &s.game.heroes {
-            pred_score[h.id] = (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) + (h.life as f64 / 20f64);
+            pred_score[h.id] = (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) +
+                               (h.life as f64 / 20f64);
 
             if h.name != s.hero.name {
                 let edist = s.game.board.shortest_path_length(&s.hero.pos, &h.pos);
@@ -77,11 +73,11 @@ impl Bot {
             }
         }
 
-        let (mdist, mpos) = s.game.board.get_closest_mine(&s.hero.pos, s.hero.id);
+        let (mdist, _) = s.game.board.get_closest_mine(&s.hero.pos, s.hero.id);
         let delay;
         if mdist < 255 && (s.hero.life < mdist || s.hero.life - mdist <= 20) {
             let (tdist, tpos) = s.game.board.get_closest_tavern(&s.hero.pos);
-            let (mdist2, mpos2) = s.game.board.get_closest_mine(&tpos, s.hero.id);
+            let (mdist2, _) = s.game.board.get_closest_mine(&tpos, s.hero.id);
             delay = 2 + (tdist + mdist2) as usize;
         } else if mdist < 255 {
             delay = mdist as usize;
@@ -112,9 +108,12 @@ impl Bot {
         if s.game.heroes[s.game.turn % 4].id == s.hero.id {
             for dir in &s.get_moves() {
                 result.push(Move {
-                    player: 0,
-                    directions: [*dir, Direction::Stay, Direction::Stay, Direction::Stay],
-                });
+                                player: 0,
+                                directions: [*dir,
+                                             Direction::Stay,
+                                             Direction::Stay,
+                                             Direction::Stay],
+                            });
             }
         } else {
             // MIN node
@@ -123,9 +122,12 @@ impl Bot {
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
-                        player: 1,
-                        directions: [Direction::Stay, *dir, Direction::Stay, Direction::Stay],
-                    });
+                                    player: 1,
+                                    directions: [Direction::Stay,
+                                                 *dir,
+                                                 Direction::Stay,
+                                                 Direction::Stay],
+                                });
                 }
             }
 
@@ -134,9 +136,12 @@ impl Bot {
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
-                        player: 2,
-                        directions: [Direction::Stay, Direction::Stay, *dir, Direction::Stay],
-                    });
+                                    player: 2,
+                                    directions: [Direction::Stay,
+                                                 Direction::Stay,
+                                                 *dir,
+                                                 Direction::Stay],
+                                });
                 }
             }
             s.unmake_move(umi);
@@ -147,24 +152,30 @@ impl Bot {
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
-                        player: 3,
-                        directions: [Direction::Stay, Direction::Stay, Direction::Stay, *dir],
-                    });
+                                    player: 3,
+                                    directions: [Direction::Stay,
+                                                 Direction::Stay,
+                                                 Direction::Stay,
+                                                 *dir],
+                                });
                 }
             }
             s.unmake_move(umi2);
             s.unmake_move(umi);
 
             result.push(Move {
-                player: 1,
-                directions: [Direction::Stay, Direction::Stay, Direction::Stay, Direction::Stay],
-            });
+                            player: 1,
+                            directions: [Direction::Stay,
+                                         Direction::Stay,
+                                         Direction::Stay,
+                                         Direction::Stay],
+                        });
         }
 
         result
     }
 
-    fn pick_next_move(&mut self, depth: u8, hm: &Move, moves: &mut Vec<Move>, s: &State) -> Move {
+    fn pick_next_move(&mut self, hm: &Move, moves: &mut Vec<Move>, s: &State) -> Move {
         if moves.is_empty() {
             return Move::default();
         }
@@ -176,7 +187,7 @@ impl Bot {
 
             if mv == hm && *hm != Move::default() {
                 best_idx = i;
-                break
+                break;
             } else if (*mv).player == self.threat_list[0] {
                 score = 5;
             } else if (*mv).player == self.threat_list[1] {
@@ -191,7 +202,12 @@ impl Bot {
                     score += hist_score;
                 }
             } else {
-                let hist_score = 6 + self.min_history.query(((*mv).player, s.game.heroes[(s.hero.id + (*mv).player as usize - 1)%4].pos, (*mv).directions[(*mv).player as usize]));
+                let hist_score =
+                    6 +
+                    self.min_history
+                        .query(((*mv).player,
+                                s.game.heroes[(s.hero.id + (*mv).player as usize - 1) % 4].pos,
+                                (*mv).directions[(*mv).player as usize]));
                 if hist_score != 255 {
                     score += hist_score;
                 }
@@ -270,7 +286,7 @@ impl Bot {
                     break;
                 }
 
-                let curmove = self.pick_next_move(depth, &bmove, &mut moves, s);
+                let curmove = self.pick_next_move(&bmove, &mut moves, s);
                 let umi = s.make_move(curmove.directions[0]);
                 let v = self.brs(s, a, beta, depth - 1, end_time, nodes);
                 s.unmake_move(umi);
@@ -284,7 +300,8 @@ impl Bot {
                     bmove = curmove;
                     bscore = score;
 
-                    self.max_history.insert((s.hero.pos, bmove.directions[0]));
+                    self.max_history
+                        .insert((s.hero.pos, bmove.directions[0]));
                 }
                 if score > g {
                     g = score;
@@ -305,7 +322,7 @@ impl Bot {
                     break;
                 }
 
-                let curmove = self.pick_next_move(depth, &bmove, &mut moves, s);
+                let curmove = self.pick_next_move(&bmove, &mut moves, s);
                 let umi1 = s.make_move(curmove.directions[1]);
                 let umi2 = s.make_move(curmove.directions[2]);
                 let umi3 = s.make_move(curmove.directions[3]);
@@ -325,7 +342,10 @@ impl Bot {
                     bmove = curmove;
                     bscore = score;
 
-                    self.min_history.insert((bmove.player, s.game.heroes[(s.hero.id - 1 + bmove.player as usize) % 4].pos, bmove.directions[0]));
+                    self.min_history
+                        .insert((bmove.player,
+                                 s.game.heroes[(s.hero.id - 1 + bmove.player as usize) % 4].pos,
+                                 bmove.directions[0]));
                 }
                 if score < g {
                     g = score;
@@ -400,11 +420,7 @@ impl Bot {
 
             let g = val.unwrap();
 
-            if g < f {
-                upper = g
-            } else {
-                lower = g
-            }
+            if g < f { upper = g } else { lower = g }
 
             if upper == g {
                 f = g - step_size;
@@ -423,16 +439,9 @@ impl Bot {
     pub fn choose_move(&mut self, s: &mut State) -> Direction {
         let end_time = time::get_time() + time::Duration::milliseconds(800);
 
-        if !self.initialized {
-            self.initialize(s);
-            if time::get_time() + time::Duration::milliseconds(200) > end_time {
-                return Direction::Stay;
-            }
-        }
-
         // Clear history
-        self.max_history = LRU::new((Position{x: -1, y: -1}, Direction::Stay));
-        self.min_history = LRU::new((4u8, Position{x: -1, y: -1}, Direction::Stay));
+        self.max_history = LRU::new((Position { x: -1, y: -1 }, Direction::Stay));
+        self.min_history = LRU::new((4u8, Position { x: -1, y: -1 }, Direction::Stay));
 
         let mut depth = 0u8;
         let mut num_nodes = 0u64;

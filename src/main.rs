@@ -35,7 +35,8 @@ fn main() {
     }
     let mut bot = bot::Bot::new();
     let client = Client::new();
-    let mut res = client.post("http://vindinium.org/api/arena")
+    let mut res = client
+        .post("http://vindinium.org/api/arena")
         .header(ContentType("application/x-www-form-urlencoded".parse().unwrap()))
         .body("key=eqwxqpa8")
         .send()
@@ -49,7 +50,7 @@ fn main() {
 
     res.read_to_string(&mut body).ok();
 
-    let mut state : state::State  = serde_json::from_str(&body).unwrap();
+    let mut state: state::State = serde_json::from_str(&body).unwrap();
     state.game.board.initialize();
 
     let mut new_state: state::State;
@@ -58,7 +59,8 @@ fn main() {
         let mv = bot.choose_move(&mut state);
         println!("{}: {}", state.game.turn, mv);
 
-        res = client.post(Url::parse(&state.play_url).unwrap())
+        res = client
+            .post(Url::parse(&state.play_url).unwrap())
             .header(ContentType("application/x-www-form-urlencoded".parse().unwrap()))
             .body(&(String::from("key=eqwxqpa8&dir=") + mv.into()))
             .send()

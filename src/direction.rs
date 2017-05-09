@@ -61,8 +61,8 @@ impl From<String> for Direction {
             "East" => Direction::East,
             "South" => Direction::South,
             "West" => Direction::West,
-                          "Stay" => Direction::Stay,
-                          "" => Direction::Stay,
+            "Stay" => Direction::Stay,
+            "" => Direction::Stay,
 
             _ => unreachable!(),
         }
@@ -84,11 +84,11 @@ impl Into<&'static str> for Direction {
 impl Into<u8> for Direction {
     fn into(self) -> u8 {
         match self {
-                    Direction::North => 0u8,
-                    Direction::East => 1u8,
-                    Direction::South => 2u8,
-                    Direction::West => 3u8,
-                    Direction::Stay => 4u8,
+            Direction::North => 0u8,
+            Direction::East => 1u8,
+            Direction::South => 2u8,
+            Direction::West => 3u8,
+            Direction::Stay => 4u8,
         }
     }
 }
@@ -100,7 +100,7 @@ impl Into<usize> for Direction {
             Direction::East => 1,
             Direction::South => 2,
             Direction::West => 3,
-            Direction::Stay => 4
+            Direction::Stay => 4,
         }
     }
 }
@@ -112,7 +112,7 @@ impl Into<u64> for Direction {
             Direction::East => 1,
             Direction::South => 2,
             Direction::West => 3,
-            Direction::Stay => 4
+            Direction::Stay => 4,
         }
     }
 }
