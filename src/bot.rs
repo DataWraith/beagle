@@ -40,8 +40,22 @@ impl Bot {
         let mut pred_score = [0f64, 0f64, 0f64, 0f64, 0f64];
         let mut rank_adj = [0f64, 0f64, 0f64, 0f64, 0f64];
 
+        let mut eval = 0.0;
+
         for h in &s.game.heroes {
-            pred_score[h.id] = (h.gold as f64 + (h.mine_count as usize * turns_left) as f64);
+            pred_score[h.id] = (h.gold as f64 + (h.mine_count as usize * turns_left) as f64) + (h.life as f64 / 20f64);
+
+            if h.name != s.hero.name {
+                let edist = s.game.board.shortest_path_length(&s.hero.pos, &h.pos);
+
+                if edist < 6 && edist != 3 && h.life / 20 <= s.hero.life / 20 {
+                    eval += 1.0;
+                } else if edist < 6 && edist != 3 && h.life / 20 > s.hero.life / 20 {
+                    eval -= 1.0;
+                } else if edist == 3 && h.life / 20 + 1 >= s.hero.life / 20 {
+                    eval -= 1.0;
+                }
+            }
         }
 
         for h in &s.game.heroes {
@@ -64,18 +78,21 @@ impl Bot {
         }
 
         let (mdist, mpos) = s.game.board.get_closest_mine(&s.hero.pos, s.hero.id);
-        let mut delay = 0 as usize;
-        if s.hero.life < mdist || s.hero.life - mdist <= 20 {
+        let delay;
+        if mdist < 255 && (s.hero.life < mdist || s.hero.life - mdist <= 20) {
             let (tdist, tpos) = s.game.board.get_closest_tavern(&s.hero.pos);
-            delay += 2 * tdist as usize;
+            let (mdist2, mpos2) = s.game.board.get_closest_mine(&tpos, s.hero.id);
+            delay = 2 + (tdist + mdist2) as usize;
+        } else if mdist < 255 {
+            delay = mdist as usize;
+        } else {
+            delay = turns_left;
         }
-        delay += mdist as usize;
 
         if delay < turns_left {
             pred_score[s.hero.id] += (turns_left - delay) as f64;
         }
 
-        let mut eval = 0.0;
         for h in &s.game.heroes {
             if h.name == s.hero.name {
                 eval += pred_score[h.id];
