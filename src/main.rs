@@ -20,6 +20,7 @@ mod tile;
 mod bot;
 mod transposition_table;
 mod zobrist;
+mod lru;
 
 use direction::Direction;
 use std::io::Read;

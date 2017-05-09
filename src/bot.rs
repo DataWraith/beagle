@@ -10,11 +10,13 @@ use mv::Move;
 use position::Position;
 use tile::Tile;
 use transposition_table::{Table, Entry};
+use lru::LRU;
 
 pub struct Bot {
     initialized: bool,
-    killer1: [Move; 33],
-    killer2: [Move; 33],
+    threat_list: [u8; 4],
+    max_history: LRU<(Position, Direction)>,
+    min_history: LRU<(u8, Position, Direction)>,
     tt: Table,
 }
 
@@ -22,9 +24,10 @@ impl Bot {
     pub fn new() -> Bot {
         Bot {
             initialized: false,
-            tt: Table::new(1000000u64),
-            killer1: [Move::default(); 33],
-            killer2: [Move::default(); 33],
+            threat_list: [1, 2, 3, 0],
+            tt: Table::new(10000000u64),
+            max_history: LRU::<(Position, Direction)>::new((Position{x: -1, y: -1}, Direction::Stay)),
+            min_history: LRU::<(u8, Position, Direction)>::new((4, Position{x: -1, y: -1}, Direction::Stay)),
         }
     }
 
@@ -92,6 +95,7 @@ impl Bot {
         if s.game.heroes[s.game.turn % 4].id == s.hero.id {
             for dir in &s.get_moves() {
                 result.push(Move {
+                    player: 0,
                     directions: [*dir, Direction::Stay, Direction::Stay, Direction::Stay],
                 });
             }
@@ -102,6 +106,7 @@ impl Bot {
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
+                        player: 1,
                         directions: [Direction::Stay, *dir, Direction::Stay, Direction::Stay],
                     });
                 }
@@ -112,6 +117,7 @@ impl Bot {
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
+                        player: 2,
                         directions: [Direction::Stay, Direction::Stay, *dir, Direction::Stay],
                     });
                 }
@@ -124,18 +130,24 @@ impl Bot {
             for dir in &s.get_moves() {
                 if *dir != Direction::Stay {
                     result.push(Move {
+                        player: 3,
                         directions: [Direction::Stay, Direction::Stay, Direction::Stay, *dir],
                     });
                 }
             }
             s.unmake_move(umi2);
             s.unmake_move(umi);
+
+            result.push(Move {
+                player: 1,
+                directions: [Direction::Stay, Direction::Stay, Direction::Stay, Direction::Stay],
+            });
         }
 
         result
     }
 
-    fn pick_next_move(&self, depth: u8, hm: &Move, moves: &mut Vec<Move>) -> Move {
+    fn pick_next_move(&mut self, depth: u8, hm: &Move, moves: &mut Vec<Move>, s: &State) -> Move {
         if moves.is_empty() {
             return Move::default();
         }
@@ -143,22 +155,34 @@ impl Bot {
         let mut best_score = 0;
         let mut best_idx = 0;
         for (i, mv) in moves.iter().enumerate() {
-            let mut score = 1;
+            let mut score = 0;
 
             if mv == hm && *hm != Move::default() {
-                score = 1000;
-            } else if *mv == self.killer1[depth as usize] || *mv == self.killer2[depth as usize] {
-                score = 100;
-            } else if *mv != Move::default() {
-                score = 10
+                best_idx = i;
+                break
+            } else if (*mv).player == self.threat_list[0] {
+                score = 5;
+            } else if (*mv).player == self.threat_list[1] {
+                score = 3;
+            } else if (*mv).player == self.threat_list[2] {
+                score = 1;
+            }
+
+            if (*mv).player == 0 {
+                let hist_score = self.max_history.query((s.hero.pos, mv.directions[0]));
+                if hist_score != 255 {
+                    score += hist_score;
+                }
+            } else {
+                let hist_score = self.min_history.query(((*mv).player, s.game.heroes[(s.hero.id + (*mv).player as usize - 1)%4].pos, (*mv).directions[(*mv).player as usize]));
+                if hist_score != 255 {
+                    score += hist_score;
+                }
             }
 
             if score > best_score {
                 best_score = score;
                 best_idx = i;
-                if best_score == 1000 {
-                    break;
-                }
             }
         }
 
@@ -187,7 +211,7 @@ impl Bot {
 
         if entry.is_some() {
             let e = entry.unwrap();
-            if e.depth >= depth as u16 {
+            if e.depth >= s.game.turn as u16 + depth as u16 {
 
                 bmove = e.mv;
                 // bscore = e.lower;
@@ -229,7 +253,7 @@ impl Bot {
                     break;
                 }
 
-                let curmove = self.pick_next_move(depth, &bmove, &mut moves);
+                let curmove = self.pick_next_move(depth, &bmove, &mut moves, s);
                 let umi = s.make_move(curmove.directions[0]);
                 let v = self.brs(s, a, beta, depth - 1, end_time, nodes);
                 s.unmake_move(umi);
@@ -242,6 +266,8 @@ impl Bot {
                 if score > bscore {
                     bmove = curmove;
                     bscore = score;
+
+                    self.max_history.insert((s.hero.pos, bmove.directions[0]));
                 }
                 if score > g {
                     g = score;
@@ -262,7 +288,7 @@ impl Bot {
                     break;
                 }
 
-                let curmove = self.pick_next_move(depth, &bmove, &mut moves);
+                let curmove = self.pick_next_move(depth, &bmove, &mut moves, s);
                 let umi1 = s.make_move(curmove.directions[1]);
                 let umi2 = s.make_move(curmove.directions[2]);
                 let umi3 = s.make_move(curmove.directions[3]);
@@ -281,12 +307,34 @@ impl Bot {
                 if score < bscore {
                     bmove = curmove;
                     bscore = score;
+
+                    self.min_history.insert((bmove.player, s.game.heroes[(s.hero.id - 1 + bmove.player as usize) % 4].pos, bmove.directions[0]));
                 }
                 if score < g {
                     g = score;
                 }
                 if g < b {
                     b = g;
+                }
+            }
+        }
+
+        if bmove.player != 0 {
+            if self.threat_list[0] != bmove.player {
+                if self.threat_list[1] != bmove.player {
+                    if self.threat_list[2] != bmove.player {
+                        self.threat_list[3] = self.threat_list[2];
+                        self.threat_list[2] = self.threat_list[1];
+                        self.threat_list[1] = self.threat_list[0];
+                        self.threat_list[0] = bmove.player;
+                    } else {
+                        self.threat_list[2] = self.threat_list[1];
+                        self.threat_list[1] = self.threat_list[0];
+                        self.threat_list[0] = bmove.player;
+                    }
+                } else {
+                    self.threat_list[1] = self.threat_list[0];
+                    self.threat_list[0] = bmove.player;
                 }
             }
         }
@@ -304,14 +352,9 @@ impl Bot {
             e.lower = g;
             e.upper = i32::max_value();
             e.mv = bmove;
-
-            if self.killer1[depth as usize] != bmove && self.killer2[depth as usize] != bmove {
-                self.killer1[depth as usize] = self.killer2[depth as usize];
-                self.killer2[depth as usize] = bmove;
-            }
         }
 
-        e.depth = depth as u16;
+        e.depth = s.game.turn as u16 + depth as u16;
         e.hash = hash;
         e.age = s.game.turn as u16;
 
@@ -370,11 +413,9 @@ impl Bot {
             }
         }
 
-        // Clear killers
-        for i in 0..33 {
-            self.killer1[i] = Move::default();
-            self.killer2[i] = Move::default();
-        }
+        // Clear history
+        self.max_history = LRU::new((Position{x: -1, y: -1}, Direction::Stay));
+        self.min_history = LRU::new((4u8, Position{x: -1, y: -1}, Direction::Stay));
 
         let mut depth = 0u8;
         let mut num_nodes = 0u64;
@@ -400,7 +441,7 @@ impl Bot {
                              e.mv.directions[0],
                              e.lower,
                              e.upper,
-                             e.depth);
+                             e.depth - s.game.turn as u16);
                     prev_b = best_d;
                     best_d = e.mv.directions[0];
                 }
