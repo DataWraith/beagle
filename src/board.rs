@@ -203,7 +203,7 @@ impl Board {
         let mut resultpos = Position{x: 0, y: 0};
 
         for tpos in &self.tavern_pos.clone() {
-            let new_d = self.shortest_path_length(pos, &tpos);
+            let new_d = self.shortest_path_length(&pos, tpos);
             if min_dist > new_d {
                 resultpos = *tpos;
                 min_dist = new_d;
@@ -216,30 +216,30 @@ impl Board {
     pub fn get_closest_mine(&mut self, pos: &Position, player_id: usize) -> (u8, Option<Position>) {
         let start_idx = self.position_idx(pos);
 
-	if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
-		return (255, None);
-	}
+        if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
+            return (255, None);
+        }
 
-	if self.minecache[start_idx].0 == 0u8 {
-		let mut min_dist = 255u8;
-		let mut mpos = Position{x: 0, y:0}; 
+        if self.minecache[start_idx].0 == 0u8 {
+            let mut min_dist = 255u8;
+            let mut mpos = Position{x: 0, y:0}; 
 
-		for mp in &self.mine_pos.clone() {
-			let d = self.shortest_path_length(pos, &mp);
-			if d < min_dist {
-				min_dist = d;
-				mpos = *mp;
-			}
-		}
+            for mp in &self.mine_pos.clone() {
+                let d = self.shortest_path_length(pos, &mp);
+                if d < min_dist {
+                    min_dist = d;
+                    mpos = *mp;
+                }
+            }
 
-		self.minecache[start_idx] = (min_dist, mpos);
-	}
+            self.minecache[start_idx] = (min_dist, mpos);
+        }
 
-	if let Tile::Mine(x) = self.tile_at(&self.minecache[start_idx].1) {
-		if x != player_id {
-			return (self.minecache[start_idx].0, Some(self.minecache[start_idx].1));
-		}
-	}
+        if let Tile::Mine(x) = self.tile_at(&self.minecache[start_idx].1) {
+		        if x != player_id {
+			          return (self.minecache[start_idx].0, Some(self.minecache[start_idx].1));
+		        }
+	      }
 
         let mut min_dist = 255u8;
         let mut mpos = None;
@@ -295,19 +295,24 @@ impl Board {
         let start_idx = self.position_idx(start);
         let goal_idx = self.position_idx(goal);
 
-	if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
-		return 255
-	}
-
-	if goal_idx < 0 || goal_idx >= (self.size as usize) * (self.size as usize) {
-		return 255
-	}
-
-        if self.pathcache[start_idx].is_empty() {
-            let tree = self.bfs(start);
-            self.pathcache[start_idx] = tree;
+        if start_idx < 0 || start_idx >= (self.size as usize) * (self.size as usize) {
+            return 255
         }
 
+        if goal_idx < 0 || goal_idx >= (self.size as usize) * (self.size as usize) {
+		        return 255
+	      }
+
+        if !self.pathcache[start_idx].is_empty() {
+            return self.pathcache[start_idx][goal_idx];
+        }
+
+        if !self.pathcache[goal_idx].is_empty() {
+            return self.pathcache[goal_idx][start_idx];
+        }
+
+        let tree = self.bfs(start);
+        self.pathcache[start_idx] = tree;
         self.pathcache[start_idx][goal_idx]
     }
 }
