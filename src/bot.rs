@@ -186,12 +186,12 @@ impl Bot {
             }
 
             if (*mv).player == 0 {
-                let hist_score = self.max_history.query((s.hero.pos, mv.directions[0]));
+                let hist_score = 6 + self.max_history.query((s.hero.pos, mv.directions[0]));
                 if hist_score != 255 {
                     score += hist_score;
                 }
             } else {
-                let hist_score = self.min_history.query(((*mv).player, s.game.heroes[(s.hero.id + (*mv).player as usize - 1)%4].pos, (*mv).directions[(*mv).player as usize]));
+                let hist_score = 6 + self.min_history.query(((*mv).player, s.game.heroes[(s.hero.id + (*mv).player as usize - 1)%4].pos, (*mv).directions[(*mv).player as usize]));
                 if hist_score != 255 {
                     score += hist_score;
                 }
